@@ -1,0 +1,15 @@
+{
+  "name": "gws-connector",
+  "owner": {
+    "name": "orieg",
+    "url": "https://github.com/orieg"
+  },
+  "plugins": [
+    {
+      "name": "gws-connector",
+      "source": ".",
+      "description": "Multi-account Google Workspace integration for Claude Code — Gmail, Calendar, and Drive with smart account routing",
+      "version": "0.1.0"
+    }
+  ]
+}

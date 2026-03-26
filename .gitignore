@@ -14,7 +14,15 @@ vendor/
 *.swp
 *.swo
 
-# Tokens (never commit)
+# Tokens and secrets (never commit)
 tokens.enc
 *.pem
 *.key
+.env
+.env.*
+
+# Internal development docs
+PLAN.md
+
+# Claude local settings (machine-specific)
+.claude/settings.local.json

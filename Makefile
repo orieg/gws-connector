@@ -2,7 +2,7 @@ BINARY := gws-mcp
 MODULE := github.com/orieg/claude-multi-gws
 VERSION := 0.1.0
 
-GO := /opt/homebrew/bin/go
+GO ?= $(shell which go)
 
 .PHONY: build install clean test lint release
 
@@ -11,13 +11,16 @@ build:
 
 install: build
 	@echo "Binary built at bin/$(BINARY)"
-	@echo "Add to your Claude Code plugin by pointing .mcp.json to this binary."
+	@echo "Install the plugin with: /plugin install /path/to/claude-multi-gws"
 
 clean:
 	rm -rf bin/
 
 test:
-	$(GO) test ./...
+	$(GO) test ./... -count=1
+
+test-verbose:
+	$(GO) test ./... -v -count=1
 
 lint:
 	$(GO) vet ./...
