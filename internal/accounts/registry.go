@@ -68,8 +68,9 @@ func (s *Store) Save(reg *Registry) error {
 	return nil
 }
 
-// Add registers a new account.
-func (s *Store) Add(email, label, displayName string) error {
+// Add registers a new account. clientID/clientSecret are optional per-account
+// OAuth credentials that override the global ones. Pass empty strings to use global.
+func (s *Store) Add(email, label, displayName, clientID, clientSecret string) error {
 	reg, err := s.Load()
 	if err != nil {
 		return err
@@ -86,12 +87,14 @@ func (s *Store) Add(email, label, displayName string) error {
 
 	isDefault := len(reg.Accounts) == 0
 	reg.Accounts = append(reg.Accounts, Account{
-		Email:       email,
-		Label:       label,
-		DisplayName: displayName,
-		AddedAt:     time.Now().UTC().Format(time.RFC3339),
-		Services:    []string{"mail", "calendar", "drive"},
-		Default:     isDefault,
+		Email:        email,
+		Label:        label,
+		DisplayName:  displayName,
+		AddedAt:      time.Now().UTC().Format(time.RFC3339),
+		Services:     []string{"mail", "calendar", "drive"},
+		Default:      isDefault,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
 	})
 
 	// Add domain routing rule
@@ -160,6 +163,21 @@ func (s *Store) SetDefault(identifier string) error {
 	}
 
 	return s.Save(reg)
+}
+
+// GetCredentials returns per-account OAuth credentials. Returns empty strings
+// if the account has no custom credentials (caller should fall back to global).
+func (s *Store) GetCredentials(email string) (clientID, clientSecret string) {
+	reg, err := s.Load()
+	if err != nil {
+		return "", ""
+	}
+	for _, a := range reg.Accounts {
+		if a.Email == email {
+			return a.ClientID, a.ClientSecret
+		}
+	}
+	return "", ""
 }
 
 // GetDefault returns the default account.

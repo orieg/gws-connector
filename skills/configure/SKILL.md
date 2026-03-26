@@ -1,30 +1,109 @@
 ---
 name: configure
-description: First-time setup wizard for the GWS connector. Checks configuration, guides through adding accounts.
+description: Step-by-step setup wizard for the GWS connector. Walks through creating a GCP project, getting OAuth credentials, and connecting accounts.
 command: gws:configure
 ---
 
 # GWS Configure
 
-Help the user set up the GWS connector plugin for the first time.
+Walk the user through the complete setup of the GWS connector plugin, step by step.
 
-## Steps
+## Step 1: Check current state
 
-1. Check if `GWS_GOOGLE_CLIENT_ID` and `GWS_GOOGLE_CLIENT_SECRET` environment variables are set. If not, guide the user:
-   - Go to https://console.cloud.google.com/apis/credentials
-   - Create a new project (or use existing)
-   - Enable the Gmail API, Google Calendar API, and Google Drive API
-   - Create an OAuth 2.0 Client ID (Application type: Desktop app)
-   - Copy the Client ID and Client Secret
-   - Set them as environment variables in their shell profile or Claude Code settings
+Call `gws.accounts.list` to see if any accounts are already connected.
 
-2. Once credentials are configured, check if any accounts are connected by calling `gws.accounts.list`.
+If accounts exist, show them and ask if the user wants to add another account or reconfigure.
 
-3. If no accounts exist, offer to add the first one using `gws.accounts.add` with a label the user chooses.
+## Step 2: Google Cloud Project setup
 
-4. After the first account is added, offer to add more accounts.
+If no credentials are configured (the tool returns an error about missing credentials), guide the user through creating a GCP project:
 
-5. If existing built-in Claude Google Calendar or Gmail connectors are detected, explain:
-   - The GWS connector plugin provides multi-account support and Drive access
-   - Both can coexist — tool names don't conflict
-   - The user can use either, or disconnect the built-in ones for a simpler experience
+### 2a. Create or select a GCP project
+
+Tell the user:
+
+> To connect Google accounts, you need OAuth credentials from a Google Cloud project. Here's how to set them up (one-time, ~5 minutes):
+>
+> **1. Go to the Google Cloud Console:**
+>    https://console.cloud.google.com/
+>
+> **2. Create a new project** (or select an existing one):
+>    - Click the project dropdown at the top → "New Project"
+>    - Name it something like "Claude GWS Connector"
+>    - Click "Create"
+>
+> **3. Enable the required APIs** — go to each link and click "Enable":
+>    - Gmail API: https://console.cloud.google.com/apis/library/gmail.googleapis.com
+>    - Google Calendar API: https://console.cloud.google.com/apis/library/calendar-json.googleapis.com
+>    - Google Drive API: https://console.cloud.google.com/apis/library/drive.googleapis.com
+>
+> **4. Configure the OAuth consent screen:**
+>    - Go to: https://console.cloud.google.com/apis/credentials/consent
+>    - Choose "External" (unless you have a Google Workspace org and want "Internal")
+>    - Fill in the app name (e.g., "Claude GWS") and your email for support contact
+>    - On the "Scopes" page, add these scopes:
+>      - `https://www.googleapis.com/auth/gmail.modify`
+>      - `https://www.googleapis.com/auth/calendar`
+>      - `https://www.googleapis.com/auth/drive`
+>      - `https://www.googleapis.com/auth/userinfo.email`
+>      - `https://www.googleapis.com/auth/userinfo.profile`
+>    - On "Test users", add your Google email address(es)
+>    - Save and continue
+>
+> **5. Create OAuth credentials:**
+>    - Go to: https://console.cloud.google.com/apis/credentials
+>    - Click "+ Create Credentials" → "OAuth client ID"
+>    - Application type: **Desktop app**
+>    - Name it (e.g., "Claude GWS Desktop")
+>    - Click "Create"
+>    - **Copy the Client ID and Client Secret** that appear
+
+Ask the user to provide the Client ID and Client Secret once they have them.
+
+### 2b. Configure credentials
+
+Once the user provides credentials, explain the two ways to set them:
+
+**Option A — Environment variables (recommended for a single GCP project):**
+
+```bash
+# Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
+export GWS_GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export GWS_GOOGLE_CLIENT_SECRET="your-client-secret"
+```
+
+Then restart Claude Code for the env vars to take effect.
+
+**Option B — Per-account credentials (for different organizations):**
+
+If different accounts belong to different Google Workspace organizations, each org may need its own GCP project. In this case, pass `clientId` and `clientSecret` directly when adding each account:
+
+```
+gws.accounts.add(label: "work", clientId: "work-client-id", clientSecret: "work-secret")
+gws.accounts.add(label: "personal", clientId: "personal-client-id", clientSecret: "personal-secret")
+```
+
+This way each account uses its own org's OAuth app.
+
+## Step 3: Connect accounts
+
+Once credentials are configured, help the user add their first account:
+
+1. Ask what label they want (e.g., "personal", "work", "client-name")
+2. Call `gws.accounts.add` with the label (and per-account credentials if provided)
+3. This opens a browser — tell the user to authorize access
+4. Confirm success
+
+Then ask: "Would you like to connect another account? Each account can use different OAuth credentials if it belongs to a different organization."
+
+## Step 4: Coexistence note
+
+If the user already has Claude's built-in Google Calendar or Gmail connectors:
+
+> You also have Claude's built-in Gmail/Calendar connectors. Both work side by side — there are no tool name conflicts. The GWS connector adds multi-account support and Google Drive. You can keep both or disconnect the built-in ones in Claude settings for a simpler experience.
+
+## Important notes
+
+- For Google Workspace (business) accounts, the Workspace admin may need to approve the OAuth app
+- The "External" consent screen in testing mode allows up to 100 test users — add each Google email you plan to connect
+- To publish the app (remove the "unverified" warning), you'd need to submit for Google verification — not needed for personal/testing use

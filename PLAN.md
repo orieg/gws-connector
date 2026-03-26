@@ -152,22 +152,29 @@ For this plugin, we use **local OAuth** (localhost redirect) since we need to ma
 - Account accepts email address or label string
 - Dot-name convention via `--use-dot-names` flag (matches Gemini extension)
 
-### Decision 5: User-provided Google Cloud client_id (no shipped default)
+### Decision 5: Per-account OAuth credentials with global fallback
 
-**Choice:** Users provide their own GCP OAuth client_id via env vars. No default shipped.
+**Choice:** Each account can have its own GCP OAuth credentials. Global env vars serve as fallback.
 
 **Rationale:**
-- Avoids the burden of maintaining a GCP project, handling Google app verification (weeks-long review process for sensitive scopes like `gmail.modify`), and managing shared quota
-- Creating a GCP project is a one-time ~5 minute setup (documented in README)
-- For "installed app" (desktop/CLI) OAuth clients, Google doesn't rely on `client_secret` being secret — PKCE flow is used
-- Enterprise users already need their own org credentials anyway
-- **Future:** Once the plugin has traction, we can create a verified GCP project and ship a default client_id as an upgrade
+- Different Google Workspace organizations (different businesses) may require different GCP projects and OAuth apps
+- A personal Gmail, a work account at Company A, and a client account at Company B each need OAuth credentials from their respective orgs
+- Global `GWS_GOOGLE_CLIENT_ID` / `GWS_GOOGLE_CLIENT_SECRET` env vars cover the common single-org case
+- Per-account `clientId` / `clientSecret` passed to `gws.accounts.add` override the global for that account
+- Stored in `accounts.json` alongside the account metadata (only if different from global)
+- `ClientFactory` resolves credentials per-account: per-account > global > error
 
 **Setup:**
 ```bash
+# Global credentials (used by default for all accounts)
 export GWS_GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 export GWS_GOOGLE_CLIENT_SECRET="your-client-secret"
+
+# Per-account credentials (passed when adding an account from a different org)
+# gws.accounts.add(label: "client-acme", clientId: "acme-id", clientSecret: "acme-secret")
 ```
+
+**`/gws:configure` walks the user through the full GCP project setup step-by-step.**
 
 ### Decision 6: Account routing with labels and domain rules
 
@@ -203,7 +210,9 @@ export GWS_GOOGLE_CLIENT_SECRET="your-client-secret"
       "displayName": "Nicolas B.",
       "addedAt": "2026-03-26T10:05:00Z",
       "services": ["gmail", "calendar", "drive"],
-      "default": false
+      "default": false,
+      "clientId": "company-specific-id.apps.googleusercontent.com",
+      "clientSecret": "company-specific-secret"
     }
   ],
   "routingRules": {
@@ -218,6 +227,7 @@ export GWS_GOOGLE_CLIENT_SECRET="your-client-secret"
 **Properties:**
 - `label` — user-assigned, used in natural language ("use my work account")
 - `default` — determines which account is used when none specified
+- `clientId` / `clientSecret` — optional per-account OAuth credentials from that org's GCP project (omitted = uses global env vars)
 - `routingRules.domains` — maps email domain patterns to accounts for auto-routing
 - Re-read on every tool call (skill-driven changes take effect immediately)
 

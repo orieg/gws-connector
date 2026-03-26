@@ -12,20 +12,42 @@ import (
 	"google.golang.org/api/option"
 )
 
-// ClientFactory creates authenticated Google API service clients for accounts.
-type ClientFactory struct {
-	tokenStore   *TokenStore
-	clientID     string
-	clientSecret string
+// AccountCredentials provides per-account OAuth credentials lookup.
+type AccountCredentials interface {
+	// GetCredentials returns the OAuth client ID and secret for the given email.
+	// Returns empty strings if no per-account credentials are set.
+	GetCredentials(email string) (clientID, clientSecret string)
 }
 
-// NewClientFactory creates a new factory.
-func NewClientFactory(tokenStore *TokenStore, clientID, clientSecret string) *ClientFactory {
+// ClientFactory creates authenticated Google API service clients for accounts.
+type ClientFactory struct {
+	tokenStore       *TokenStore
+	globalClientID   string
+	globalClientSec  string
+	accountCreds     AccountCredentials
+}
+
+// NewClientFactory creates a new factory. accountCreds can be nil if no
+// per-account credentials are needed.
+func NewClientFactory(tokenStore *TokenStore, clientID, clientSecret string, accountCreds AccountCredentials) *ClientFactory {
 	return &ClientFactory{
-		tokenStore:   tokenStore,
-		clientID:     clientID,
-		clientSecret: clientSecret,
+		tokenStore:      tokenStore,
+		globalClientID:  clientID,
+		globalClientSec: clientSecret,
+		accountCreds:    accountCreds,
 	}
+}
+
+// credentialsForAccount returns the OAuth client ID and secret to use for
+// the given account. Per-account credentials take priority over global.
+func (f *ClientFactory) credentialsForAccount(email string) (string, string) {
+	if f.accountCreds != nil {
+		cid, csec := f.accountCreds.GetCredentials(email)
+		if cid != "" && csec != "" {
+			return cid, csec
+		}
+	}
+	return f.globalClientID, f.globalClientSec
 }
 
 // httpClient returns an authenticated HTTP client for the given account.
@@ -35,7 +57,8 @@ func (f *ClientFactory) httpClient(ctx context.Context, email string) (*http.Cli
 		return nil, fmt.Errorf("loading token for %s: %w — try running /gws:add-account to re-authenticate", email, err)
 	}
 
-	ts := TokenSourceForAccount(ctx, f.clientID, f.clientSecret, token)
+	clientID, clientSecret := f.credentialsForAccount(email)
+	ts := TokenSourceForAccount(ctx, clientID, clientSecret, token)
 
 	// Get a fresh token (auto-refreshes if expired)
 	newToken, err := ts.Token()

@@ -40,7 +40,7 @@ func New(cfg Config) *Server {
 	store := accounts.NewStore(cfg.StateDir)
 	router := accounts.NewRouter(store)
 	tokenStore := auth.NewTokenStore(cfg.StateDir)
-	clientFactory := auth.NewClientFactory(tokenStore, cfg.ClientID, cfg.ClientSecret)
+	clientFactory := auth.NewClientFactory(tokenStore, cfg.ClientID, cfg.ClientSecret, store)
 
 	s := &Server{
 		config:        cfg,
@@ -83,8 +83,12 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "add"),
-			mcp.WithDescription("Connect a new Google account via OAuth. Opens browser for authorization."),
+			mcp.WithDescription("Connect a new Google account via OAuth. Opens browser for authorization. "+
+				"Uses global GWS_GOOGLE_CLIENT_ID by default. For accounts in different organizations, "+
+				"provide custom clientId/clientSecret from that org's GCP project."),
 			mcp.WithString("label", mcp.Required(), mcp.Description("A short label for this account (e.g., 'work', 'personal', 'client-acme')")),
+			mcp.WithString("clientId", mcp.Description("OAuth Client ID for this account's GCP project. If omitted, uses the global GWS_GOOGLE_CLIENT_ID env var.")),
+			mcp.WithString("clientSecret", mcp.Description("OAuth Client Secret for this account's GCP project. Required if clientId is provided.")),
 		),
 		s.handleAccountsAdd,
 	)
@@ -151,17 +155,29 @@ func (s *Server) handleAccountsAdd(ctx context.Context, req mcp.CallToolRequest)
 		return errorResult(fmt.Errorf("label is required")), nil
 	}
 
-	if s.config.ClientID == "" || s.config.ClientSecret == "" {
-		return errorResult(fmt.Errorf(
-			"GWS_GOOGLE_CLIENT_ID and GWS_GOOGLE_CLIENT_SECRET environment variables must be set.\n\n" +
-				"To set up:\n" +
-				"1. Go to https://console.cloud.google.com/apis/credentials\n" +
-				"2. Create an OAuth 2.0 Client ID (type: Desktop app)\n" +
-				"3. Enable Gmail, Calendar, and Drive APIs\n" +
-				"4. Set the env vars and restart Claude")), nil
+	// Per-account credentials override global ones
+	clientID, _ := req.GetArguments()["clientId"].(string)
+	clientSecret, _ := req.GetArguments()["clientSecret"].(string)
+
+	// Fall back to global credentials if not provided per-account
+	if clientID == "" {
+		clientID = s.config.ClientID
+	}
+	if clientSecret == "" {
+		clientSecret = s.config.ClientSecret
 	}
 
-	token, info, err := auth.OAuthFlow(ctx, s.config.ClientID, s.config.ClientSecret)
+	if clientID == "" || clientSecret == "" {
+		return errorResult(fmt.Errorf(
+			"OAuth credentials are required. Provide them either:\n\n" +
+				"**Option A — Global (for all accounts using the same GCP project):**\n" +
+				"Set GWS_GOOGLE_CLIENT_ID and GWS_GOOGLE_CLIENT_SECRET env vars\n\n" +
+				"**Option B — Per-account (for different organizations):**\n" +
+				"Pass clientId and clientSecret parameters to this tool\n\n" +
+				"Run /gws:configure for step-by-step setup instructions.")), nil
+	}
+
+	token, info, err := auth.OAuthFlow(ctx, clientID, clientSecret)
 	if err != nil {
 		return errorResult(fmt.Errorf("OAuth authorization failed: %w", err)), nil
 	}
@@ -171,15 +187,24 @@ func (s *Server) handleAccountsAdd(ctx context.Context, req mcp.CallToolRequest)
 		return errorResult(fmt.Errorf("saving token: %w", err)), nil
 	}
 
-	// Register account
-	if err := s.accountStore.Add(info.Email, label, info.DisplayName); err != nil {
+	// Register account with per-account credentials (empty strings if using global)
+	perAcctID, perAcctSec := "", ""
+	if clientID != s.config.ClientID {
+		perAcctID = clientID
+		perAcctSec = clientSecret
+	}
+	if err := s.accountStore.Add(info.Email, label, info.DisplayName, perAcctID, perAcctSec); err != nil {
 		return errorResult(fmt.Errorf("registering account: %w", err)), nil
 	}
 
 	accts, _ := s.accountRouter.ListAccounts()
+	credNote := "using global credentials"
+	if perAcctID != "" {
+		credNote = "using custom credentials for this org"
+	}
 	return textResult(fmt.Sprintf(
-		"Successfully connected %s (%s) as '%s'. You now have %d account(s) connected.",
-		info.DisplayName, info.Email, label, len(accts),
+		"Successfully connected %s (%s) as '%s' (%s). You now have %d account(s) connected.",
+		info.DisplayName, info.Email, label, credNote, len(accts),
 	)), nil
 }
 
