@@ -1,0 +1,20 @@
+# Binary output
+bin/
+*.exe
+
+# Go
+vendor/
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Tokens (never commit)
+tokens.enc
+*.pem
+*.key

@@ -1,0 +1,11 @@
+{
+  "gws-connector": {
+    "command": "${CLAUDE_PLUGIN_ROOT}/bin/gws-mcp",
+    "args": ["--use-dot-names"],
+    "env": {
+      "GWS_STATE_DIR": "${HOME}/.claude/channels/gws",
+      "GWS_GOOGLE_CLIENT_ID": "${GWS_GOOGLE_CLIENT_ID}",
+      "GWS_GOOGLE_CLIENT_SECRET": "${GWS_GOOGLE_CLIENT_SECRET}"
+    }
+  }
+}
