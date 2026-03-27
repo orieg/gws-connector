@@ -81,8 +81,8 @@ git clone https://github.com/orieg/gws-connector
 cd gws-connector
 make build
 
-# Launch Claude Code with the plugin loaded
-claude --plugin-dir /path/to/gws-connector
+# Launch Claude Code with the plugin loaded from the cloned repo
+claude --plugin-dir ./
 ```
 
 Use `/reload-plugins` inside the session after making changes.
@@ -100,7 +100,7 @@ Once loaded, run `/gws:configure` for an interactive setup wizard.
 <details>
 <summary><strong>Claude Code (MCP server only)</strong></summary>
 
-If you only want the MCP tools without skills/hooks/agents:
+If you only want the MCP tools without skills/hooks/agents, point Claude at the binary directly. Use a [prebuilt binary](#install) or build from source first, then:
 
 ```bash
 claude mcp add --transport stdio gws-connector --scope user \
