@@ -56,15 +56,15 @@ make build
 
 ### Configure credentials
 
-Set your default OAuth credentials as environment variables:
+Credentials are provided **per-account** when you connect each account — no environment variables needed. When you create OAuth credentials in GCP, download the `client_secret_*.json` file. The `/gws:configure` skill reads it directly.
 
-```bash
-# Add to ~/.zshrc or ~/.bashrc
-export GWS_GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export GWS_GOOGLE_CLIENT_SECRET="your-client-secret"
+You can also pass credentials explicitly:
+
+```
+gws.accounts.add(label: "personal", clientId: "your-client-id", clientSecret: "your-secret")
 ```
 
-These are used for all accounts by default. If you connect accounts from different Google Workspace organizations, you can provide per-account credentials when adding each account — see [Multiple organizations](#multiple-organizations).
+Different accounts can use different GCP projects — see [Multiple organizations](#multiple-organizations).
 
 ### Install per platform
 

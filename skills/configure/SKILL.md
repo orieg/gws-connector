@@ -59,45 +59,40 @@ Tell the user:
 >    - Application type: **Desktop app**
 >    - Name it (e.g., "Claude GWS Desktop")
 >    - Click "Create"
->    - **Copy the Client ID and Client Secret** that appear
+>    - **Download the JSON file** (click the download button)
 
-Ask the user to provide the Client ID and Client Secret once they have them.
+Ask the user where they saved the downloaded `client_secret_*.json` file.
 
-### 2b. Configure credentials
+### 2b. Read credentials from the JSON file
 
-Once the user provides credentials, explain the two ways to set them:
+Once the user provides the path to the downloaded JSON file:
 
-**Option A — Environment variables (recommended for a single GCP project):**
+1. Read the file using the Read tool
+2. Extract `client_id` and `client_secret` from the `installed` object in the JSON
+3. Store these values — you will pass them as `clientId` and `clientSecret` when adding accounts
 
-```bash
-# Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
-export GWS_GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export GWS_GOOGLE_CLIENT_SECRET="your-client-secret"
+The JSON file has this structure:
+```json
+{
+  "installed": {
+    "client_id": "...",
+    "client_secret": "..."
+  }
+}
 ```
 
-Then restart Claude Code for the env vars to take effect.
-
-**Option B — Per-account credentials (for different organizations):**
-
-If different accounts belong to different Google Workspace organizations, each org may need its own GCP project. In this case, pass `clientId` and `clientSecret` directly when adding each account:
-
-```
-gws.accounts.add(label: "work", clientId: "work-client-id", clientSecret: "work-secret")
-gws.accounts.add(label: "personal", clientId: "personal-client-id", clientSecret: "personal-secret")
-```
-
-This way each account uses its own org's OAuth app.
+**Do NOT ask the user to set environment variables.** Credentials are passed directly per-account. This supports multi-account setups where different accounts use different GCP projects.
 
 ## Step 3: Connect accounts
 
-Once credentials are configured, help the user add their first account:
+Help the user add their first account:
 
 1. Ask what label they want (e.g., "personal", "work", "client-name")
-2. Call `gws.accounts.add` with the label (and per-account credentials if provided)
+2. Call `gws.accounts.add` with the label AND the `clientId` and `clientSecret` extracted from the JSON file
 3. This opens a browser — tell the user to authorize access
 4. Confirm success
 
-Then ask: "Would you like to connect another account? Each account can use different OAuth credentials if it belongs to a different organization."
+Then ask: "Would you like to connect another account? If it belongs to a different organization, you'll need a separate GCP project and credentials JSON for that org."
 
 ## Step 4: Coexistence note
 

@@ -13,26 +13,27 @@ The user provides a label (e.g., "work", "personal", "client-acme") that will be
 
 ## Steps
 
-1. Ask the user for a label for this account
-2. Ask if this account belongs to a different organization than previously connected accounts:
-   - **Same org / personal Gmail**: Use global credentials (no extra params needed)
-   - **Different org**: Ask for that org's OAuth Client ID and Client Secret (from their GCP project). Pass them as `clientId` and `clientSecret` params.
-3. Call `gws.accounts.add` with the label (and per-account credentials if provided)
+1. Ask the user for a label for this account (e.g., "work", "personal", "client-acme")
+2. Ask the user for their credentials. Accept either:
+   - A **path to a `client_secret_*.json` file** downloaded from GCP — read it and extract `client_id` and `client_secret` from the `installed` object
+   - A **Client ID and Client Secret** pasted directly
+3. Call `gws.accounts.add` with the label AND `clientId` and `clientSecret` params
 4. This opens a browser for Google OAuth consent
 5. Report success with the connected email and total account count
 
-## Per-account credentials
+## Credential handling
 
-Different Google Workspace organizations may require different GCP OAuth apps. For example:
+Every account gets its own credentials passed directly — do NOT rely on environment variables.
 
-- `personal` account: uses global `GWS_GOOGLE_CLIENT_ID`
-- `work` account at Company A: uses Company A's OAuth client ID
-- `client-acme` account: uses Acme Corp's OAuth client ID
+If the user has a `client_secret_*.json` file, read it with the Read tool. The JSON has this structure:
+```json
+{"installed": {"client_id": "...", "client_secret": "..."}}
+```
 
-Each org's admin creates their own GCP project with OAuth credentials. Pass these when adding the account.
+If the user already connected an account using the same GCP project, you can reuse those credentials. Check existing accounts with `gws.accounts.list` — the user can confirm if the same project applies.
 
 ## Notes
 
-- If no credentials are available at all, the tool returns setup instructions (or run /gws:configure)
+- If no credentials are provided, the tool returns setup instructions (or run /gws:configure)
 - The first account added becomes the default
 - The browser must be accessible for the OAuth flow
