@@ -86,7 +86,12 @@ Once credentials are available, help the user add their first account:
 1. Ask what label they want (e.g., "personal", "work", "client-name")
 2. Call `gws.accounts.add` with the label, clientId, and clientSecret
 3. This opens a browser — tell the user to authorize access
-4. Confirm success — the client secret is now stored in the OS keychain
+4. **If the user gets "Access blocked: has not completed the Google verification process" (error 403):**
+   - They need to add their Google email as a test user in the GCP project
+   - Go to: https://console.cloud.google.com/auth/audience
+   - Click "Add users" and enter the exact email address they're trying to authorize
+   - Save, then retry the OAuth flow
+5. Confirm success — the client secret is now stored in the OS keychain
 
 Then ask: "Would you like to connect another account? Each account can use different OAuth credentials if it belongs to a different organization."
 
