@@ -264,6 +264,7 @@ One-time setup (~5 minutes):
 
 5. **Add test users** — go to [Audience](https://console.cloud.google.com/auth/audience):
    - Add each Google email address you plan to connect
+   - ⚠️ **This is required** — without this you'll get "Access blocked: has not completed the Google verification process" (error 403) during OAuth
 
 6. **Create OAuth credentials** — go to [Clients](https://console.cloud.google.com/auth/clients):
    - Click "+ Create Client" → "OAuth client ID"
