@@ -93,7 +93,7 @@ Use `/reload-plugins` inside the session after making changes.
 /plugin install gws-connector
 ```
 
-Once loaded, run `/gws-connector:configure` for an interactive setup wizard.
+Once loaded, run `/gws:configure` for an interactive setup wizard.
 
 </details>
 
@@ -205,7 +205,7 @@ The `--use-dot-names` flag uses `gws.mail.search` naming; without it, tools use 
 gws.accounts.add(label: "personal")
 
 # Or in Claude Code (plugin)
-/gws-connector:add-account
+/gws:add-account
 ```
 
 This opens a browser for Google OAuth. The first account becomes the default. Add more by running the command again with a different label.
@@ -251,11 +251,11 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 
 | Command | Description |
 |---------|-------------|
-| `/gws-connector:configure` | Interactive setup wizard |
-| `/gws-connector:add-account` | Connect a new account |
-| `/gws-connector:remove-account` | Disconnect an account |
-| `/gws-connector:list-accounts` | Show connected accounts |
-| `/gws-connector:set-default` | Change default account |
+| `/gws:configure` | Interactive setup wizard |
+| `/gws:add-account` | Connect a new account |
+| `/gws:remove-account` | Disconnect an account |
+| `/gws:list-accounts` | Show connected accounts |
+| `/gws:set-default` | Change default account |
 
 ## Google Cloud Setup
 

@@ -1,5 +1,5 @@
 {
-  "name": "gws-connector",
+  "name": "gws",
   "version": "0.1.0",
   "description": "Multi-account workspace integration — Mail, Calendar, and Drive with smart account routing for Gmail and Google Workspace",
   "author": {
