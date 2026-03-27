@@ -63,13 +63,18 @@ Tell the user:
 
 Ask the user where they saved the downloaded `client_secret_*.json` file.
 
-### 2b. Read credentials from the JSON file
+### 2b. Read and store credentials
 
 Once the user provides the path to the downloaded JSON file:
 
-1. Read the file using the Read tool
-2. Extract `client_id` and `client_secret` from the `installed` object in the JSON
-3. Store these values — you will pass them as `clientId` and `clientSecret` when adding accounts
+1. Ask what label they want for this account (e.g., "personal", "work", "client-acme")
+2. Read the file using the Read tool
+3. Extract `client_id` and `client_secret` from the `installed` object in the JSON
+4. Copy the JSON file to a safe per-account location:
+   ```
+   ~/.config/gws-connector/client_secret_<label>.json
+   ```
+   Create the directory if it doesn't exist. This preserves one credentials file per account so they don't overwrite each other.
 
 The JSON file has this structure:
 ```json
@@ -85,7 +90,7 @@ The JSON file has this structure:
 
 ## Step 3: Connect accounts
 
-Help the user add their first account:
+Using the label and extracted credentials from step 2:
 
 1. Ask what label they want (e.g., "personal", "work", "client-name")
 2. Call `gws.accounts.add` with the label AND the `clientId` and `clientSecret` extracted from the JSON file
