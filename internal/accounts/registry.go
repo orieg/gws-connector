@@ -97,11 +97,13 @@ func (s *Store) Add(email, label, displayName, clientID, clientSecret string) er
 		ClientSecret: clientSecret,
 	})
 
-	// Add domain routing rule (only if no rule exists for this domain yet)
+	// Add domain routing rule (only if no rule exists for this domain yet).
+	// Normalize domain to lowercase so ResolveByDomain lookups match.
 	parts := strings.SplitN(email, "@", 2)
 	if len(parts) == 2 {
-		if _, exists := reg.RoutingRules.Domains[parts[1]]; !exists {
-			reg.RoutingRules.Domains[parts[1]] = email
+		domain := strings.ToLower(parts[1])
+		if _, exists := reg.RoutingRules.Domains[domain]; !exists {
+			reg.RoutingRules.Domains[domain] = email
 		}
 	}
 

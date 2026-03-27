@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -30,7 +31,10 @@ func NewTokenStore(stateDir string) *TokenStore {
 	if err != nil {
 		ts.useFileStorage = true
 	} else {
-		_ = keyring.Delete(keychainService, testKey) // best-effort cleanup
+		if delErr := keyring.Delete(keychainService, testKey); delErr != nil {
+			log.Printf("warning: keychain probe cleanup failed: %v (falling back to file storage)", delErr)
+			ts.useFileStorage = true
+		}
 	}
 
 	return ts

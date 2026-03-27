@@ -12,16 +12,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.25']
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go ${{ matrix.go-version }}
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
 
       - name: Download dependencies
         run: go mod download
@@ -33,10 +30,12 @@ jobs:
         run: go vet ./...
 
       - name: Build
-        run: go build -o bin/gws-mcp ./cmd/gws-mcp
+        run: |
+          mkdir -p bin
+          go build -o bin/gws-mcp ./cmd/gws-mcp
 
       - name: Test
-        run: go test ./... -count=1 -race
+        run: go test -race -count=1 ./...
 
       - name: Cross-compile (darwin/arm64)
         run: GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/gws-mcp
