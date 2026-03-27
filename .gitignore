@@ -8,9 +8,12 @@ vendor/
 # OS
 .DS_Store
 
-# IDE
+# IDE (but keep MCP configs for cross-platform support)
 .idea/
-.vscode/
+.vscode/*
+!.vscode/mcp.json
+.cursor/*
+!.cursor/mcp.json
 *.swp
 *.swo
 

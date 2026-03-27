@@ -9,8 +9,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"google.golang.org/api/drive/v3"
 
-	"github.com/orieg/claude-multi-gws/internal/accounts"
-	"github.com/orieg/claude-multi-gws/internal/auth"
+	"github.com/orieg/gws-connector/internal/accounts"
+	"github.com/orieg/gws-connector/internal/auth"
 )
 
 // DriveService implements Drive-related MCP tools.

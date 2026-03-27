@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "gws-connector": {
+      "command": "./bin/gws-mcp",
+      "args": [],
+      "env": {
+        "GWS_GOOGLE_CLIENT_ID": "${env:GWS_GOOGLE_CLIENT_ID}",
+        "GWS_GOOGLE_CLIENT_SECRET": "${env:GWS_GOOGLE_CLIENT_SECRET}"
+      }
+    }
+  }
+}

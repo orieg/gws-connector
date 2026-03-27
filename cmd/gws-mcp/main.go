@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/orieg/claude-multi-gws/internal/server"
+	"github.com/orieg/gws-connector/internal/server"
 )
 
 func main() {

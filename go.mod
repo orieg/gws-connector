@@ -1,4 +1,4 @@
-module github.com/orieg/claude-multi-gws
+module github.com/orieg/gws-connector
 
 go 1.25.6
 

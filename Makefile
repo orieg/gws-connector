@@ -1,5 +1,5 @@
 BINARY := gws-mcp
-MODULE := github.com/orieg/claude-multi-gws
+MODULE := github.com/orieg/gws-connector
 VERSION := 0.1.0
 
 GO ?= $(shell which go)
@@ -11,7 +11,7 @@ build:
 
 install: build
 	@echo "Binary built at bin/$(BINARY)"
-	@echo "Install the plugin with: /plugin install /path/to/claude-multi-gws"
+	@echo "Install the plugin with: /plugin install /path/to/gws-connector"
 
 clean:
 	rm -rf bin/

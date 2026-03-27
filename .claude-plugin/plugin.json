@@ -6,7 +6,7 @@
     "name": "orieg",
     "url": "https://github.com/orieg"
   },
-  "repository": "https://github.com/orieg/claude-multi-gws",
+  "repository": "https://github.com/orieg/gws-connector",
   "license": "MIT",
   "keywords": [
     "gws", "mail", "calendar", "drive", "workspace",
