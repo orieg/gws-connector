@@ -100,11 +100,11 @@ func (s *Server) registerTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "add"),
 			mcp.WithDescription("Connect a new Google account via OAuth. Opens browser for authorization. "+
-				"Uses global GWS_GOOGLE_CLIENT_ID by default. For accounts in different organizations, "+
-				"provide custom clientId/clientSecret from that org's GCP project."),
+				"Each account stores its own credentials. For accounts in different organizations, "+
+				"provide that org's clientId/clientSecret from their GCP project."),
 			mcp.WithString("label", mcp.Required(), mcp.Description("A short label for this account (e.g., 'work', 'personal', 'client-acme')")),
-			mcp.WithString("clientId", mcp.Description("OAuth Client ID for this account's GCP project. If omitted, uses the global GWS_GOOGLE_CLIENT_ID env var.")),
-			mcp.WithString("clientSecret", mcp.Description("OAuth Client Secret for this account's GCP project. Required if clientId is provided.")),
+			mcp.WithString("clientId", mcp.Description("OAuth Client ID for this account's GCP project.")),
+			mcp.WithString("clientSecret", mcp.Description("OAuth Client Secret for this account's GCP project. Stored securely in OS keychain.")),
 		),
 		s.handleAccountsAdd,
 	)
@@ -187,11 +187,8 @@ func (s *Server) handleAccountsAdd(ctx context.Context, req mcp.CallToolRequest)
 
 	if clientID == "" || clientSecret == "" {
 		return errorResult(fmt.Errorf(
-			"OAuth credentials are required. Provide them either:\n\n" +
-				"**Option A — Global (for all accounts using the same GCP project):**\n" +
-				"Set GWS_GOOGLE_CLIENT_ID and GWS_GOOGLE_CLIENT_SECRET env vars\n\n" +
-				"**Option B — Per-account (for different organizations):**\n" +
-				"Pass clientId and clientSecret parameters to this tool\n\n" +
+			"OAuth credentials are required. Pass clientId and clientSecret parameters.\n\n" +
+				"You can get these from your GCP project's OAuth client credentials.\n" +
 				"Run /gws:configure for step-by-step setup instructions.")), nil
 	}
 

@@ -13,6 +13,7 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Multi-account** — connect unlimited Gmail and Google Workspace accounts
 - **Smart routing** — target accounts by label (`work`), email, or domain
 - **Per-account OAuth** — different orgs can use their own GCP credentials
+- **Secure storage** — client secrets and tokens stored in OS keychain (file fallback on Linux without GNOME Keyring)
 - **17 tools** — Mail (search, read, draft, labels), Calendar (list, get, create), Drive (search, read, list)
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
@@ -54,18 +55,6 @@ make build
 # Binary is at ./bin/gws-mcp
 ```
 
-### Configure credentials
-
-Set your default OAuth credentials as environment variables:
-
-```bash
-# Add to ~/.zshrc or ~/.bashrc
-export GWS_GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export GWS_GOOGLE_CLIENT_SECRET="your-client-secret"
-```
-
-These are used for all accounts by default. If you connect accounts from different Google Workspace organizations, you can provide per-account credentials when adding each account — see [Multiple organizations](#multiple-organizations).
-
 ### Install per platform
 
 <details>
@@ -81,11 +70,11 @@ git clone https://github.com/orieg/gws-connector
 cd gws-connector
 make build
 
-# Launch Claude Code with the plugin loaded from the cloned repo
+# Launch Claude Code with the plugin loaded
 claude --plugin-dir ./
 ```
 
-Use `/reload-plugins` inside the session after making changes.
+Use `/reload-plugins` inside the session after making changes. Run `claude --debug --plugin-dir ./` to troubleshoot plugin loading.
 
 **Option B — Marketplace:**
 
@@ -93,7 +82,7 @@ Use `/reload-plugins` inside the session after making changes.
 /plugin install gws-connector
 ```
 
-Once loaded, run `/gws:configure` for an interactive setup wizard.
+Once loaded, run `/gws:configure` for an interactive setup wizard that walks through GCP project creation, OAuth credentials, and connecting accounts.
 
 </details>
 
@@ -123,11 +112,7 @@ Or add manually to your VS Code settings:
   "mcp": {
     "servers": {
       "gws-connector": {
-        "command": "/path/to/gws-mcp",
-        "env": {
-          "GWS_GOOGLE_CLIENT_ID": "your-client-id",
-          "GWS_GOOGLE_CLIENT_SECRET": "your-secret"
-        }
+        "command": "/path/to/gws-mcp"
       }
     }
   }
@@ -147,11 +132,7 @@ Or add manually via **Settings → MCP Servers → Add**:
 {
   "mcpServers": {
     "gws-connector": {
-      "command": "/path/to/gws-mcp",
-      "env": {
-        "GWS_GOOGLE_CLIENT_ID": "your-client-id",
-        "GWS_GOOGLE_CLIENT_SECRET": "your-secret"
-      }
+      "command": "/path/to/gws-mcp"
     }
   }
 }
@@ -168,11 +149,7 @@ Add to your `codex.json` (the repo includes one):
 {
   "mcpServers": {
     "gws-connector": {
-      "command": "/path/to/gws-mcp",
-      "env": {
-        "GWS_GOOGLE_CLIENT_ID": "your-client-id",
-        "GWS_GOOGLE_CLIENT_SECRET": "your-secret"
-      }
+      "command": "/path/to/gws-mcp"
     }
   }
 }
@@ -189,26 +166,28 @@ The `gws-mcp` binary is a standard MCP server speaking JSON-RPC over stdio. Poin
 gws-mcp [--use-dot-names]
 ```
 
-Environment variables:
-- `GWS_GOOGLE_CLIENT_ID` — OAuth client ID (required)
-- `GWS_GOOGLE_CLIENT_SECRET` — OAuth client secret (required)
+Environment variables (all optional):
+- `GWS_GOOGLE_CLIENT_ID` — global fallback OAuth client ID
+- `GWS_GOOGLE_CLIENT_SECRET` — global fallback OAuth client secret
 - `GWS_STATE_DIR` — state directory (default: `~/.claude/channels/gws`)
 
 The `--use-dot-names` flag uses `gws.mail.search` naming; without it, tools use `gws_mail_search`.
+
+Credentials are provided per-account when connecting (via `gws.accounts.add`). Global env vars are only used as a fallback.
 
 </details>
 
 ### Connect accounts
 
 ```
-# Via MCP tool call
-gws.accounts.add(label: "personal")
+# Via MCP tool call — credentials are stored securely in OS keychain
+gws.accounts.add(label: "personal", clientId: "your-client-id", clientSecret: "your-secret")
 
-# Or in Claude Code (plugin)
+# Or in Claude Code (plugin) — interactive wizard
 /gws:add-account
 ```
 
-This opens a browser for Google OAuth. The first account becomes the default. Add more by running the command again with a different label.
+This opens a browser for Google OAuth. The first account becomes the default. Add more by running the command again with a different label. Each account can use different OAuth credentials from different GCP projects.
 
 ## Usage
 
@@ -268,25 +247,40 @@ One-time setup (~5 minutes):
    - [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
    - [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
 
-3. **Configure [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)**:
+3. **Configure the [OAuth consent screen](https://console.cloud.google.com/auth/consent)**:
    - Choose "External" (or "Internal" for Google Workspace orgs)
-   - Add required scopes: `gmail.modify`, `calendar`, `drive`, `userinfo.email`, `userinfo.profile`
-   - Add your Google email as a test user
+   - Fill in the app name (e.g., "Claude GWS") and your email for support contact
+   - Click "Save"
 
-4. **Create [OAuth credentials](https://console.cloud.google.com/apis/credentials)**:
-   - Click "+ Create Credentials" → "OAuth client ID"
+4. **Add scopes** — go to [Data Access](https://console.cloud.google.com/auth/scopes):
+   - Click "Add or Remove Scopes"
+   - Add these 5 scopes (paste into the "Manually add scopes" box):
+     - `https://www.googleapis.com/auth/gmail.modify`
+     - `https://www.googleapis.com/auth/calendar`
+     - `https://www.googleapis.com/auth/drive`
+     - `https://www.googleapis.com/auth/userinfo.email`
+     - `https://www.googleapis.com/auth/userinfo.profile`
+   - Click "Update", then "Save"
+
+5. **Add test users** — go to [Audience](https://console.cloud.google.com/auth/audience):
+   - Add each Google email address you plan to connect
+
+6. **Create OAuth credentials** — go to [Clients](https://console.cloud.google.com/auth/clients):
+   - Click "+ Create Client" → "OAuth client ID"
    - Application type: **Desktop app**
-   - Copy the Client ID and Client Secret
+   - Click "Create"
+   - **Download the JSON file** (click the download icon) — this contains your Client ID and Client Secret
 
 ### Multiple organizations
 
-If you connect accounts from different Google Workspace orgs, each org may need its own GCP project with OAuth credentials. Pass per-account credentials when adding:
+If you connect accounts from different Google Workspace orgs, each org needs its own GCP project. Create OAuth credentials in each project and provide them when connecting:
 
 ```
-gws.accounts.add(label: "work", clientId: "org-client-id", clientSecret: "org-secret")
+gws.accounts.add(label: "work", clientId: "work-client-id", clientSecret: "work-secret")
+gws.accounts.add(label: "personal", clientId: "personal-client-id", clientSecret: "personal-secret")
 ```
 
-Accounts that don't specify credentials will use the global `GWS_GOOGLE_CLIENT_ID` / `GWS_GOOGLE_CLIENT_SECRET` environment variables.
+Client secrets are stored in the OS keychain. Client IDs are stored in the account registry.
 
 ## Architecture
 
@@ -311,8 +305,9 @@ gws-connector/
 ```
 
 - **Token storage**: OS keychain (macOS Keychain, GNOME Keyring, Windows Credential Manager) with automatic file fallback
-- **Account registry**: JSON file at `~/.claude/channels/gws/accounts.json`
-- **Credential resolution**: per-account OAuth credentials → global env vars
+- **Client secrets**: OS keychain per account (not stored in config files)
+- **Account registry**: JSON file at `~/.claude/channels/gws/accounts.json` (contains client IDs and metadata, no secrets)
+- **Credential resolution**: per-account credentials (keychain) → global env var fallback
 - **Protocol**: MCP (Model Context Protocol) over stdio — compatible with any MCP client
 
 ## Development
