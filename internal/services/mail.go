@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -353,20 +354,108 @@ func extractBody(payload *gmail.MessagePart) string {
 		return ""
 	}
 
-	// Check for plain text body directly
-	if payload.MimeType == "text/plain" && payload.Body != nil && payload.Body.Data != "" {
-		decoded, err := base64.URLEncoding.DecodeString(payload.Body.Data)
-		if err == nil {
-			return string(decoded)
-		}
-	}
+	// Collect all text/plain and text/html parts
+	var plain, html string
+	collectParts(payload, &plain, &html)
 
-	// Recurse into parts
-	for _, part := range payload.Parts {
-		if body := extractBody(part); body != "" {
-			return body
-		}
+	if plain != "" {
+		return plain
 	}
-
+	if html != "" {
+		return htmlToText(html)
+	}
 	return ""
+}
+
+// collectParts recursively finds the first text/plain and text/html parts.
+func collectParts(part *gmail.MessagePart, plain, html *string) {
+	if part == nil {
+		return
+	}
+
+	if part.Body != nil && part.Body.Data != "" {
+		decoded, err := base64.URLEncoding.DecodeString(part.Body.Data)
+		if err == nil {
+			switch part.MimeType {
+			case "text/plain":
+				if *plain == "" {
+					*plain = string(decoded)
+				}
+			case "text/html":
+				if *html == "" {
+					*html = string(decoded)
+				}
+			}
+		}
+	}
+
+	for _, child := range part.Parts {
+		collectParts(child, plain, html)
+	}
+}
+
+// Precompiled regexes for HTML-to-text conversion.
+var (
+	reAnchor     = regexp.MustCompile(`(?i)<a\s[^>]*href\s*=\s*["']([^"']*)["'][^>]*>(.*?)</a>`)
+	reBlock      = regexp.MustCompile(`(?i)</(p|div|tr|li|h[1-6]|blockquote)>`)
+	reBr         = regexp.MustCompile(`(?i)<br\s*/?>`)
+	reStyle      = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	reScript     = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	reTag        = regexp.MustCompile(`<[^>]+>`)
+	reWhitespace = regexp.MustCompile(`[ \t]+`)
+	reBlankLines = regexp.MustCompile(`\n{3,}`)
+)
+
+// htmlToText converts HTML to readable plain text, preserving link URLs.
+func htmlToText(html string) string {
+	// Remove style/script blocks
+	s := reStyle.ReplaceAllString(html, "")
+	s = reScript.ReplaceAllString(s, "")
+
+	// Preserve links: <a href="url">text</a> → text (url)
+	s = reAnchor.ReplaceAllStringFunc(s, func(match string) string {
+		sub := reAnchor.FindStringSubmatch(match)
+		if len(sub) < 3 {
+			return match
+		}
+		href, text := sub[1], strings.TrimSpace(sub[2])
+		// Strip any nested tags from link text
+		text = reTag.ReplaceAllString(text, "")
+		text = strings.TrimSpace(text)
+		if text == "" || strings.EqualFold(text, href) {
+			return href + " "
+		}
+		return text + " (" + href + ") "
+	})
+
+	// Block-level closing tags → newlines
+	s = reBlock.ReplaceAllString(s, "\n")
+	s = reBr.ReplaceAllString(s, "\n")
+
+	// Strip remaining tags
+	s = reTag.ReplaceAllString(s, "")
+
+	// Decode common HTML entities
+	s = strings.NewReplacer(
+		"&amp;", "&",
+		"&lt;", "<",
+		"&gt;", ">",
+		"&quot;", `"`,
+		"&#39;", "'",
+		"&apos;", "'",
+		"&nbsp;", " ",
+	).Replace(s)
+
+	// Collapse whitespace
+	s = reWhitespace.ReplaceAllString(s, " ")
+	// Trim each line
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimSpace(line)
+	}
+	s = strings.Join(lines, "\n")
+	// Collapse excessive blank lines
+	s = reBlankLines.ReplaceAllString(s, "\n\n")
+
+	return strings.TrimSpace(s)
 }
