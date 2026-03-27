@@ -39,9 +39,9 @@ func NewClientFactory(tokenStore *TokenStore, clientID, clientSecret string, acc
 	}
 }
 
-// credentialsForAccount returns the OAuth client ID and secret to use for
+// CredentialsForAccount returns the OAuth client ID and secret to use for
 // the given account. Per-account credentials (keychain) take priority over global.
-func (f *ClientFactory) credentialsForAccount(email string) (string, string) {
+func (f *ClientFactory) CredentialsForAccount(email string) (string, string) {
 	// Try per-account client ID from registry
 	clientID := ""
 	if f.accountCreds != nil {
@@ -65,7 +65,7 @@ func (f *ClientFactory) httpClient(ctx context.Context, email string) (*http.Cli
 		return nil, fmt.Errorf("loading token for %s: %w — try running /gws:add-account to re-authenticate", email, err)
 	}
 
-	clientID, clientSecret := f.credentialsForAccount(email)
+	clientID, clientSecret := f.CredentialsForAccount(email)
 	ts := TokenSourceForAccount(ctx, clientID, clientSecret, token)
 
 	// Get a fresh token (auto-refreshes if expired)
