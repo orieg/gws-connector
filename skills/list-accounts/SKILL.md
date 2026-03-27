@@ -1,7 +1,6 @@
 ---
 name: list-accounts
-description: Show all connected Google Workspace accounts with their labels and default status.
-command: gws:accounts
+description: Show all connected GWS accounts with their labels and default status.
 ---
 
 # List Accounts

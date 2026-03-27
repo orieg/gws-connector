@@ -1,8 +1,6 @@
 ---
 name: add-account
 description: Connect a new Google account to the GWS connector with a custom label. Supports per-account OAuth credentials for different organizations.
-command: gws:add-account
-args: "<label> [--client-id <id> --client-secret <secret>]"
 ---
 
 # Add Account

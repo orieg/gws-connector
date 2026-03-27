@@ -69,24 +69,45 @@ These are used for all accounts by default. If you connect accounts from differe
 ### Install per platform
 
 <details>
-<summary><strong>Claude Code</strong></summary>
+<summary><strong>Claude Code (plugin — recommended)</strong></summary>
 
-**Option A — Plugin install (recommended):**
+Installing as a plugin gives you the MCP server **plus** skills, hooks, and agents.
 
+**Option A — Local install (dev/testing):**
+
+```bash
+# Clone and build
+git clone https://github.com/orieg/gws-connector
+cd gws-connector
+make build
+
+# Launch Claude Code with the plugin loaded from the cloned repo
+claude --plugin-dir ./
 ```
-/plugin install /path/to/gws-connector
-```
 
-This auto-registers the MCP server, skills (`/gws:configure`, `/gws:add-account`), and hooks.
+Use `/reload-plugins` inside the session after making changes.
 
 **Option B — Marketplace:**
 
 ```
-/plugin marketplace add orieg/gws-connector
 /plugin install gws-connector
 ```
 
-Then run `/gws:configure` for an interactive setup wizard.
+Once loaded, run `/gws:configure` for an interactive setup wizard.
+
+</details>
+
+<details>
+<summary><strong>Claude Code (MCP server only)</strong></summary>
+
+If you only want the MCP tools without skills/hooks/agents, point Claude at the binary directly. Use a [prebuilt binary](#install) or build from source first, then:
+
+```bash
+claude mcp add --transport stdio gws-connector --scope user \
+  -- /path/to/gws-mcp --use-dot-names
+```
+
+Verify with `claude mcp list` or `/mcp` inside a session.
 
 </details>
 
@@ -183,7 +204,7 @@ The `--use-dot-names` flag uses `gws.mail.search` naming; without it, tools use 
 # Via MCP tool call
 gws.accounts.add(label: "personal")
 
-# Or in Claude Code
+# Or in Claude Code (plugin)
 /gws:add-account
 ```
 
@@ -226,7 +247,7 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.drive.read_file` | Read file content/metadata |
 | `gws.drive.list_folder` | List folder contents |
 
-### Skills (Claude Code only)
+### Skills (Claude Code plugin only)
 
 | Command | Description |
 |---------|-------------|
