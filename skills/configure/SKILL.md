@@ -45,7 +45,7 @@ Tell the user:
 > **5. Add scopes** — go to the Data Access tab:
 >    - Go to: https://console.cloud.google.com/auth/scopes
 >    - Click "Add or Remove Scopes"
->    - In the panel that opens, paste these scopes into the "Manually add scopes" box at the bottom (one at a time or comma-separated):
+>    - In the panel that opens, paste these scopes into the "Manually add scopes" box at the bottom (one per line):
 >      - `https://www.googleapis.com/auth/gmail.modify`
 >      - `https://www.googleapis.com/auth/calendar`
 >      - `https://www.googleapis.com/auth/drive`
