@@ -106,12 +106,15 @@ func (m *MailService) ReadMessage(ctx context.Context, req mcp.CallToolRequest) 
 		return ErrorResult(fmt.Errorf("messageId is required")), nil
 	}
 
+	format, _ := req.GetArguments()["format"].(string)
+	raw := strings.EqualFold(format, "raw")
+
 	msg, err := svc.Users.Messages.Get("me", messageId).Format("full").Do()
 	if err != nil {
 		return ErrorResult(fmt.Errorf("reading message on %s: %w", acct.Label, err)), nil
 	}
 
-	return TextResult(formatMessage(msg, acct)), nil
+	return TextResult(formatMessage(msg, acct, raw)), nil
 }
 
 // ReadThread reads all messages in a thread.
@@ -126,6 +129,9 @@ func (m *MailService) ReadThread(ctx context.Context, req mcp.CallToolRequest) (
 		return ErrorResult(fmt.Errorf("threadId is required")), nil
 	}
 
+	format, _ := req.GetArguments()["format"].(string)
+	raw := strings.EqualFold(format, "raw")
+
 	thread, err := svc.Users.Threads.Get("me", threadId).Format("full").Do()
 	if err != nil {
 		return ErrorResult(fmt.Errorf("reading thread on %s: %w", acct.Label, err)), nil
@@ -135,7 +141,7 @@ func (m *MailService) ReadThread(ctx context.Context, req mcp.CallToolRequest) (
 	sb.WriteString(fmt.Sprintf("Thread %s on %s (%s) — %d message(s):\n\n", threadId, acct.Label, acct.Email, len(thread.Messages)))
 	for i, msg := range thread.Messages {
 		sb.WriteString(fmt.Sprintf("--- Message %d/%d ---\n", i+1, len(thread.Messages)))
-		sb.WriteString(formatMessage(msg, acct))
+		sb.WriteString(formatMessage(msg, acct, raw))
 		sb.WriteString("\n")
 	}
 
@@ -318,7 +324,7 @@ func (m *MailService) GetProfile(ctx context.Context, req mcp.CallToolRequest) (
 
 // --- helpers ---
 
-func formatMessage(msg *gmail.Message, acct *accounts.Account) string {
+func formatMessage(msg *gmail.Message, acct *accounts.Account, raw bool) string {
 	var sb strings.Builder
 
 	from, to, subject, date := "", "", "", ""
@@ -339,14 +345,38 @@ func formatMessage(msg *gmail.Message, acct *accounts.Account) string {
 	sb.WriteString(fmt.Sprintf("From: %s\nTo: %s\nSubject: %s\nDate: %s\n", from, to, subject, date))
 	sb.WriteString(fmt.Sprintf("ID: %s | Thread: %s\n\n", msg.Id, msg.ThreadId))
 
-	body := extractBody(msg.Payload)
-	if body != "" {
-		sb.WriteString(body)
+	if raw {
+		body := extractRawBody(msg.Payload)
+		if body != "" {
+			sb.WriteString(body)
+		} else {
+			sb.WriteString("[No text content]")
+		}
 	} else {
-		sb.WriteString("[No text content]")
+		body := extractBody(msg.Payload)
+		if body != "" {
+			sb.WriteString(body)
+		} else {
+			sb.WriteString("[No text content]")
+		}
 	}
 
 	return sb.String()
+}
+
+// extractRawBody returns the original body without conversion — prefers HTML, falls back to plain text.
+func extractRawBody(payload *gmail.MessagePart) string {
+	if payload == nil {
+		return ""
+	}
+
+	var plain, html string
+	collectParts(payload, &plain, &html)
+
+	if html != "" {
+		return html
+	}
+	return plain
 }
 
 func extractBody(payload *gmail.MessagePart) string {
