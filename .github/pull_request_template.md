@@ -4,6 +4,6 @@
 
 ## Test plan
 
-- [ ] `go test ./... -race` passes
-- [ ] `go vet ./...` clean
+- [ ] `make test` passes
+- [ ] `make lint` clean
 - [ ] Tested manually (describe what you tried)

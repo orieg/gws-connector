@@ -17,10 +17,10 @@ clean:
 	rm -rf bin/
 
 test:
-	$(GO) test ./... -count=1
+	$(GO) test -race -count=1 ./...
 
 test-verbose:
-	$(GO) test ./... -v -count=1
+	$(GO) test -race -v -count=1 ./...
 
 lint:
 	$(GO) vet ./...
