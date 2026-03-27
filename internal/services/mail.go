@@ -49,6 +49,9 @@ func (m *MailService) Search(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	if mr, ok := req.GetArguments()["maxResults"].(float64); ok && mr > 0 {
 		maxResults = int64(mr)
 	}
+	if maxResults > 500 {
+		maxResults = 500
+	}
 
 	call := svc.Users.Messages.List("me").Q(query).MaxResults(maxResults)
 	resp, err := call.Do()

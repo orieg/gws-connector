@@ -311,6 +311,54 @@ func TestFilePermissions(t *testing.T) {
 	}
 }
 
+func TestAddDuplicateEmailCaseInsensitive(t *testing.T) {
+	store := tempStore(t)
+	store.Add("alice@example.com", "personal", "Alice", "", "")
+
+	err := store.Add("Alice@Example.COM", "other", "Alice 2", "", "")
+	if err != ErrAccountExists {
+		t.Errorf("expected ErrAccountExists for case-different email, got %v", err)
+	}
+}
+
+func TestAddDuplicateLabelCaseInsensitive(t *testing.T) {
+	store := tempStore(t)
+	store.Add("alice@example.com", "personal", "Alice", "", "")
+
+	err := store.Add("bob@work.com", "Personal", "Bob", "", "")
+	if err != ErrLabelInUse {
+		t.Errorf("expected ErrLabelInUse for case-different label, got %v", err)
+	}
+}
+
+func TestAddSameDomainDoesNotOverwriteRoutingRule(t *testing.T) {
+	store := tempStore(t)
+	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("bob@example.com", "work", "Bob", "", "")
+
+	reg, _ := store.Load()
+	email, ok := reg.RoutingRules.Domains["example.com"]
+	if !ok {
+		t.Fatal("expected routing rule for example.com")
+	}
+	if email != "alice@example.com" {
+		t.Errorf("routing rule should still point to alice, got %s", email)
+	}
+}
+
+func TestAddDomainRoutingNormalizesCase(t *testing.T) {
+	store := tempStore(t)
+	store.Add("alice@Example.COM", "personal", "Alice", "", "")
+
+	reg, _ := store.Load()
+	if _, ok := reg.RoutingRules.Domains["example.com"]; !ok {
+		t.Error("expected routing rule stored with lowercase domain key")
+	}
+	if _, ok := reg.RoutingRules.Domains["Example.COM"]; ok {
+		t.Error("domain key should be lowercase, not original case")
+	}
+}
+
 func TestServicesField(t *testing.T) {
 	store := tempStore(t)
 	store.Add("alice@example.com", "personal", "Alice", "", "")

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"html"
 	"net"
 	"net/http"
 	"os/exec"
@@ -75,8 +76,9 @@ func OAuthFlow(ctx context.Context, clientID, clientSecret string) (*oauth2.Toke
 		if errMsg := r.URL.Query().Get("error"); errMsg != "" {
 			errCh <- fmt.Errorf("OAuth error: %s — %s", errMsg, r.URL.Query().Get("error_description"))
 			w.Header().Set("Content-Type", "text/html")
-			fmt.Fprintf(w, "<html><body><h2>Authorization failed</h2><p>%s</p><p>You can close this window.</p></body></html>",
-				strings.ReplaceAll(errMsg, "<", "&lt;")) // XSS-safe
+			fmt.Fprint(w, oauthPageHTML("Authorization Failed",
+				fmt.Sprintf("Error: %s", errMsg),
+				true))
 			return
 		}
 		code := r.URL.Query().Get("code")
@@ -87,7 +89,9 @@ func OAuthFlow(ctx context.Context, clientID, clientSecret string) (*oauth2.Toke
 		}
 		codeCh <- code
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, "<html><body><h2>Authorization successful!</h2><p>You can close this window and return to your editor.</p></body></html>")
+		fmt.Fprint(w, oauthPageHTML("Authorization Successful",
+			"Your Google account has been connected. You can close this window and return to your editor.",
+			false))
 	})
 
 	server := &http.Server{
@@ -174,6 +178,54 @@ func openBrowser(url string) error {
 	default:
 		return fmt.Errorf("unsupported OS %q for opening browser — open this URL manually", runtime.GOOS)
 	}
+}
+
+// oauthPageHTML returns a styled HTML page for the OAuth callback result.
+func oauthPageHTML(title, message string, isError bool) string {
+	color := "#1a73e8"
+	icon := "&#10003;" // checkmark
+	if isError {
+		color = "#d93025"
+		icon = "&#10007;" // X mark
+	}
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GWS Connector — %s</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; background: #f8f9fa; color: #202124;
+  }
+  .card {
+    background: #fff; border-radius: 12px; padding: 48px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.06);
+    text-align: center; max-width: 420px; width: 90%%;
+  }
+  .icon {
+    width: 64px; height: 64px; border-radius: 50%%;
+    background: %s; color: #fff; font-size: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-bottom: 24px;
+  }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 12px; }
+  p  { font-size: 15px; line-height: 1.5; color: #5f6368; }
+  .hint { margin-top: 24px; font-size: 13px; color: #9aa0a6; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">%s</div>
+  <h1>%s</h1>
+  <p>%s</p>
+  <p class="hint">GWS Connector for Claude Code</p>
+</div>
+</body>
+</html>`, html.EscapeString(title), color, icon, html.EscapeString(title), html.EscapeString(message))
 }
 
 // BuildOAuth2Config creates an oauth2.Config for the given credentials.

@@ -49,6 +49,9 @@ func (d *DriveService) Search(ctx context.Context, req mcp.CallToolRequest) (*mc
 	if mr, ok := req.GetArguments()["maxResults"].(float64); ok && mr > 0 {
 		maxResults = int64(mr)
 	}
+	if maxResults > 100 {
+		maxResults = 100
+	}
 
 	call := svc.Files.List().
 		Q(query).
@@ -176,6 +179,9 @@ func (d *DriveService) ListFolder(ctx context.Context, req mcp.CallToolRequest) 
 	maxResults := int64(50)
 	if mr, ok := req.GetArguments()["maxResults"].(float64); ok && mr > 0 {
 		maxResults = int64(mr)
+	}
+	if maxResults > 100 {
+		maxResults = 100
 	}
 
 	// Sanitize folderId to prevent query injection — only allow alphanumeric, hyphens, underscores

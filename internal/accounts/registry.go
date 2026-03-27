@@ -77,10 +77,10 @@ func (s *Store) Add(email, label, displayName, clientID, clientSecret string) er
 	}
 
 	for _, a := range reg.Accounts {
-		if a.Email == email {
+		if strings.EqualFold(a.Email, email) {
 			return ErrAccountExists
 		}
-		if a.Label == label {
+		if strings.EqualFold(a.Label, label) {
 			return ErrLabelInUse
 		}
 	}
@@ -97,10 +97,14 @@ func (s *Store) Add(email, label, displayName, clientID, clientSecret string) er
 		ClientSecret: clientSecret,
 	})
 
-	// Add domain routing rule
+	// Add domain routing rule (only if no rule exists for this domain yet).
+	// Normalize domain to lowercase so ResolveByDomain lookups match.
 	parts := strings.SplitN(email, "@", 2)
 	if len(parts) == 2 {
-		reg.RoutingRules.Domains[parts[1]] = email
+		domain := strings.ToLower(parts[1])
+		if _, exists := reg.RoutingRules.Domains[domain]; !exists {
+			reg.RoutingRules.Domains[domain] = email
+		}
 	}
 
 	return s.Save(reg)
@@ -115,7 +119,7 @@ func (s *Store) Remove(identifier string) error {
 
 	idx := -1
 	for i, a := range reg.Accounts {
-		if a.Email == identifier || a.Label == identifier {
+		if strings.EqualFold(a.Email, identifier) || strings.EqualFold(a.Label, identifier) {
 			idx = i
 			break
 		}
@@ -151,7 +155,7 @@ func (s *Store) SetDefault(identifier string) error {
 
 	found := false
 	for i := range reg.Accounts {
-		if reg.Accounts[i].Email == identifier || reg.Accounts[i].Label == identifier {
+		if strings.EqualFold(reg.Accounts[i].Email, identifier) || strings.EqualFold(reg.Accounts[i].Label, identifier) {
 			reg.Accounts[i].Default = true
 			found = true
 		} else {
@@ -173,7 +177,7 @@ func (s *Store) GetCredentials(email string) (clientID, clientSecret string) {
 		return "", ""
 	}
 	for _, a := range reg.Accounts {
-		if a.Email == email {
+		if strings.EqualFold(a.Email, email) {
 			return a.ClientID, a.ClientSecret
 		}
 	}

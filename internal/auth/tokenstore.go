@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -13,7 +14,7 @@ import (
 const keychainService = "claude-gws-connector"
 
 // TokenStore manages OAuth tokens for multiple accounts.
-// Primary storage: OS keychain. Fallback: encrypted file on disk.
+// Primary storage: OS keychain. Fallback: file on disk (restricted permissions).
 type TokenStore struct {
 	stateDir       string
 	useFileStorage bool // fallback when keychain unavailable
@@ -30,7 +31,10 @@ func NewTokenStore(stateDir string) *TokenStore {
 	if err != nil {
 		ts.useFileStorage = true
 	} else {
-		keyring.Delete(keychainService, testKey)
+		if delErr := keyring.Delete(keychainService, testKey); delErr != nil {
+			log.Printf("warning: keychain probe cleanup failed: %v (falling back to file storage)", delErr)
+			ts.useFileStorage = true
+		}
 	}
 
 	return ts
