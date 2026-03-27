@@ -268,13 +268,18 @@ One-time setup (~5 minutes):
    - [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
    - [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
 
-3. **Configure [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)**:
-   - Choose "External" (or "Internal" for Google Workspace orgs)
-   - Add required scopes: `gmail.modify`, `calendar`, `drive`, `userinfo.email`, `userinfo.profile`
-   - Add your Google email as a test user
+3. **Configure [OAuth consent screen](https://console.cloud.google.com/auth/overview)**:
+   - Under **Branding**, set the app name (e.g., "Claude GWS") and your email
+   - Under **Audience**, choose "External" (or "Internal" for Google Workspace orgs)
+   - Under **Audience → Test users**, add your Google email address(es)
 
-4. **Create [OAuth credentials](https://console.cloud.google.com/apis/credentials)**:
-   - Click "+ Create Credentials" → "OAuth client ID"
+4. **Add API scopes** under [Data Access](https://console.cloud.google.com/auth/scopes):
+   - Click "Add or remove scopes"
+   - Add: `gmail.modify`, `calendar`, `drive`, `userinfo.email`, `userinfo.profile`
+   - Click "Update", then "Save"
+
+5. **Create [OAuth credentials](https://console.cloud.google.com/apis/credentials)**:
+   - Click "+ Create Client" → "OAuth client ID"
    - Application type: **Desktop app**
    - Copy the Client ID and Client Secret
 

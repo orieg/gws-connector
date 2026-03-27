@@ -37,21 +37,25 @@ Tell the user:
 >    - Google Drive API: https://console.cloud.google.com/apis/library/drive.googleapis.com
 >
 > **4. Configure the OAuth consent screen:**
->    - Go to: https://console.cloud.google.com/apis/credentials/consent
->    - Choose "External" (unless you have a Google Workspace org and want "Internal")
->    - Fill in the app name (e.g., "Claude GWS") and your email for support contact
->    - On the "Scopes" page, add these scopes:
+>    - Go to: https://console.cloud.google.com/auth/overview
+>    - Under **Branding**, set the app name (e.g., "Claude GWS") and your email
+>    - Under **Audience**, choose "External" (or "Internal" for Google Workspace orgs)
+>    - Under **Audience → Test users**, add your Google email address(es)
+>
+> **5. Add API scopes:**
+>    - Go to **Data Access** in the left sidebar (https://console.cloud.google.com/auth/scopes)
+>    - Click "Add or remove scopes"
+>    - Add these 5 scopes (paste each into the "Manually add scopes" box):
 >      - `https://www.googleapis.com/auth/gmail.modify`
 >      - `https://www.googleapis.com/auth/calendar`
 >      - `https://www.googleapis.com/auth/drive`
 >      - `https://www.googleapis.com/auth/userinfo.email`
 >      - `https://www.googleapis.com/auth/userinfo.profile`
->    - On "Test users", add your Google email address(es)
->    - Save and continue
+>    - Click "Update", then "Save"
 >
-> **5. Create OAuth credentials:**
->    - Go to: https://console.cloud.google.com/apis/credentials
->    - Click "+ Create Credentials" → "OAuth client ID"
+> **6. Create OAuth credentials:**
+>    - Go to **Clients** in the left sidebar (https://console.cloud.google.com/apis/credentials)
+>    - Click "+ Create Client" → "OAuth client ID"
 >    - Application type: **Desktop app**
 >    - Name it (e.g., "Claude GWS Desktop")
 >    - Click "Create"
