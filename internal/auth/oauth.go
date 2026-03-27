@@ -36,13 +36,12 @@ type UserInfo struct {
 // OAuthFlow runs an interactive OAuth2 authorization for a new account.
 // It starts a local HTTP server, opens the browser, and waits for the callback.
 func OAuthFlow(ctx context.Context, clientID, clientSecret string) (*oauth2.Token, *UserInfo, error) {
-	// Find a free port
+	// Bind a free port — keep the listener open to prevent TOCTOU races.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, nil, fmt.Errorf("finding free port: %w", err)
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
-	listener.Close()
 
 	redirectURL := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 
@@ -57,6 +56,7 @@ func OAuthFlow(ctx context.Context, clientID, clientSecret string) (*oauth2.Toke
 	// Generate state for CSRF protection
 	stateBytes := make([]byte, 16)
 	if _, err := rand.Read(stateBytes); err != nil {
+		listener.Close()
 		return nil, nil, fmt.Errorf("generating state: %w", err)
 	}
 	state := hex.EncodeToString(stateBytes)
@@ -68,13 +68,15 @@ func OAuthFlow(ctx context.Context, clientID, clientSecret string) (*oauth2.Toke
 	mux := http.NewServeMux()
 	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("state") != state {
-			errCh <- fmt.Errorf("invalid state parameter")
+			errCh <- fmt.Errorf("invalid state parameter — possible CSRF attack")
 			http.Error(w, "Invalid state", http.StatusBadRequest)
 			return
 		}
 		if errMsg := r.URL.Query().Get("error"); errMsg != "" {
 			errCh <- fmt.Errorf("OAuth error: %s — %s", errMsg, r.URL.Query().Get("error_description"))
-			fmt.Fprintf(w, "<html><body><h2>Authorization failed</h2><p>%s</p><p>You can close this window.</p></body></html>", errMsg)
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprintf(w, "<html><body><h2>Authorization failed</h2><p>%s</p><p>You can close this window.</p></body></html>",
+				strings.ReplaceAll(errMsg, "<", "&lt;")) // XSS-safe
 			return
 		}
 		code := r.URL.Query().Get("code")
@@ -84,20 +86,27 @@ func OAuthFlow(ctx context.Context, clientID, clientSecret string) (*oauth2.Toke
 			return
 		}
 		codeCh <- code
-		fmt.Fprint(w, "<html><body><h2>Authorization successful!</h2><p>You can close this window and return to Claude.</p></body></html>")
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, "<html><body><h2>Authorization successful!</h2><p>You can close this window and return to your editor.</p></body></html>")
 	})
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf("127.0.0.1:%d", port),
-		Handler: mux,
+		Handler:      mux,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
 	}
 
+	// Serve on the already-bound listener (no TOCTOU gap)
 	go func() {
-		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+		if err := server.Serve(listener); err != http.ErrServerClosed {
 			errCh <- fmt.Errorf("callback server: %w", err)
 		}
 	}()
-	defer server.Shutdown(ctx)
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		server.Shutdown(shutdownCtx)
+	}()
 
 	// Open browser
 	authURL := conf.AuthCodeURL(state,
@@ -155,19 +164,16 @@ func fetchUserInfo(ctx context.Context, conf *oauth2.Config, token *oauth2.Token
 }
 
 func openBrowser(url string) error {
-	var cmd string
-	var args []string
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = "open"
-		args = []string{url}
+		return exec.Command("open", url).Start()
 	case "linux":
-		cmd = "xdg-open"
-		args = []string{url}
+		return exec.Command("xdg-open", url).Start()
+	case "windows":
+		return exec.Command("cmd", "/c", "start", url).Start()
 	default:
-		return fmt.Errorf("unsupported OS %q for opening browser", runtime.GOOS)
+		return fmt.Errorf("unsupported OS %q for opening browser — open this URL manually", runtime.GOOS)
 	}
-	return exec.Command(cmd, args...).Start()
 }
 
 // BuildOAuth2Config creates an oauth2.Config for the given credentials.

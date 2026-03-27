@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -391,35 +390,9 @@ func (s *Server) registerDriveTools() {
 	)
 }
 
-// --- Helpers ---
+// --- Helpers (delegate to services package) ---
 
-func textResult(text string) *mcp.CallToolResult {
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: text,
-			},
-		},
-	}
-}
-
-func jsonResult(v any) *mcp.CallToolResult {
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return errorResult(err)
-	}
-	return textResult(string(data))
-}
-
-func errorResult(err error) *mcp.CallToolResult {
-	return &mcp.CallToolResult{
-		IsError: true,
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: err.Error(),
-			},
-		},
-	}
-}
+var (
+	textResult  = services.TextResult
+	errorResult = services.ErrorResult
+)

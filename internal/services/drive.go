@@ -102,6 +102,8 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 		return ErrorResult(fmt.Errorf("getting file metadata on %s: %w", acct.Label, err)), nil
 	}
 
+	const maxReadSize = 5 * 1024 * 1024 // 5MB safety limit
+
 	var content string
 
 	// Google Docs types need export
@@ -112,7 +114,10 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 			return ErrorResult(fmt.Errorf("exporting doc on %s: %w", acct.Label, err)), nil
 		}
 		defer resp.Body.Close()
-		data, _ := io.ReadAll(resp.Body)
+		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
+		if err != nil {
+			return ErrorResult(fmt.Errorf("reading doc export on %s: %w", acct.Label, err)), nil
+		}
 		content = string(data)
 
 	case "application/vnd.google-apps.spreadsheet":
@@ -121,7 +126,10 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 			return ErrorResult(fmt.Errorf("exporting sheet on %s: %w", acct.Label, err)), nil
 		}
 		defer resp.Body.Close()
-		data, _ := io.ReadAll(resp.Body)
+		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
+		if err != nil {
+			return ErrorResult(fmt.Errorf("reading sheet export on %s: %w", acct.Label, err)), nil
+		}
 		content = string(data)
 
 	case "application/vnd.google-apps.presentation":
@@ -130,7 +138,10 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 			return ErrorResult(fmt.Errorf("exporting slides on %s: %w", acct.Label, err)), nil
 		}
 		defer resp.Body.Close()
-		data, _ := io.ReadAll(resp.Body)
+		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
+		if err != nil {
+			return ErrorResult(fmt.Errorf("reading slides export on %s: %w", acct.Label, err)), nil
+		}
 		content = string(data)
 
 	default:
@@ -140,7 +151,10 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 			return ErrorResult(fmt.Errorf("downloading file on %s: %w", acct.Label, err)), nil
 		}
 		defer resp.Body.Close()
-		data, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024)) // 1MB limit
+		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
+		if err != nil {
+			return ErrorResult(fmt.Errorf("reading file on %s: %w", acct.Label, err)), nil
+		}
 		content = string(data)
 	}
 
@@ -164,10 +178,17 @@ func (d *DriveService) ListFolder(ctx context.Context, req mcp.CallToolRequest) 
 		maxResults = int64(mr)
 	}
 
-	query := "'root' in parents and trashed = false"
+	// Sanitize folderId to prevent query injection — only allow alphanumeric, hyphens, underscores
+	safeFolderId := "root"
 	if folderId != "" {
-		query = fmt.Sprintf("'%s' in parents and trashed = false", folderId)
+		for _, c := range folderId {
+			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+				return ErrorResult(fmt.Errorf("invalid folderId: contains disallowed characters")), nil
+			}
+		}
+		safeFolderId = folderId
 	}
+	query := fmt.Sprintf("'%s' in parents and trashed = false", safeFolderId)
 
 	call := svc.Files.List().
 		Q(query).

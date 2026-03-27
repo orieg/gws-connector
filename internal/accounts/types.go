@@ -1,7 +1,5 @@
 package accounts
 
-import "time"
-
 // Account represents a connected Google Workspace account.
 type Account struct {
 	Email        string   `json:"email"`
@@ -23,13 +21,4 @@ type RoutingRules struct {
 type Registry struct {
 	Accounts     []Account    `json:"accounts"`
 	RoutingRules RoutingRules `json:"routingRules"`
-}
-
-// TokenData holds OAuth tokens for a single account.
-type TokenData struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	TokenType    string    `json:"token_type"`
-	Expiry       time.Time `json:"expiry"`
-	Scopes       []string  `json:"scopes"`
 }
