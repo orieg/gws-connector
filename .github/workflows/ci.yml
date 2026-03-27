@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.25']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build -o bin/gws-mcp ./cmd/gws-mcp
+
+      - name: Test
+        run: go test ./... -count=1 -race
+
+      - name: Cross-compile (darwin/arm64)
+        run: GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/gws-mcp
+
+      - name: Cross-compile (linux/arm64)
+        run: GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/gws-mcp

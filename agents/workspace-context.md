@@ -43,7 +43,7 @@ At the beginning of a session, if the user hasn't specified what they need:
 ## Drive Operations
 
 - Google Docs/Sheets/Slides are exported as text/CSV/text respectively when read
-- Regular files are downloaded with a 1MB size limit for text content
+- Regular files are downloaded with a 5MB size limit for text content
 - Use Drive search query syntax: `name contains 'report'`, `mimeType = 'application/pdf'`
 
 ## Safety

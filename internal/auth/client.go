@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"golang.org/x/oauth2"
@@ -68,7 +69,9 @@ func (f *ClientFactory) httpClient(ctx context.Context, email string) (*http.Cli
 
 	// Persist refreshed token if it changed
 	if newToken.AccessToken != token.AccessToken {
-		f.tokenStore.Save(email, newToken)
+		if err := f.tokenStore.Save(email, newToken); err != nil {
+			log.Printf("gws-connector: failed to persist refreshed token for %s: %v", email, err)
+		}
 	}
 
 	return oauth2.NewClient(ctx, ts), nil

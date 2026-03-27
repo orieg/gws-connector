@@ -51,6 +51,9 @@ func (c *CalendarService) ListEvents(ctx context.Context, req mcp.CallToolReques
 	if mr, ok := req.GetArguments()["maxResults"].(float64); ok && mr > 0 {
 		maxResults = int64(mr)
 	}
+	if maxResults > 250 {
+		maxResults = 250
+	}
 
 	if calendarId == "" {
 		calendarId = "primary"

@@ -77,10 +77,10 @@ func (s *Store) Add(email, label, displayName, clientID, clientSecret string) er
 	}
 
 	for _, a := range reg.Accounts {
-		if a.Email == email {
+		if strings.EqualFold(a.Email, email) {
 			return ErrAccountExists
 		}
-		if a.Label == label {
+		if strings.EqualFold(a.Label, label) {
 			return ErrLabelInUse
 		}
 	}
@@ -97,10 +97,12 @@ func (s *Store) Add(email, label, displayName, clientID, clientSecret string) er
 		ClientSecret: clientSecret,
 	})
 
-	// Add domain routing rule
+	// Add domain routing rule (only if no rule exists for this domain yet)
 	parts := strings.SplitN(email, "@", 2)
 	if len(parts) == 2 {
-		reg.RoutingRules.Domains[parts[1]] = email
+		if _, exists := reg.RoutingRules.Domains[parts[1]]; !exists {
+			reg.RoutingRules.Domains[parts[1]] = email
+		}
 	}
 
 	return s.Save(reg)
