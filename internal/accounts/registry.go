@@ -117,7 +117,7 @@ func (s *Store) Remove(identifier string) error {
 
 	idx := -1
 	for i, a := range reg.Accounts {
-		if a.Email == identifier || a.Label == identifier {
+		if strings.EqualFold(a.Email, identifier) || strings.EqualFold(a.Label, identifier) {
 			idx = i
 			break
 		}
@@ -153,7 +153,7 @@ func (s *Store) SetDefault(identifier string) error {
 
 	found := false
 	for i := range reg.Accounts {
-		if reg.Accounts[i].Email == identifier || reg.Accounts[i].Label == identifier {
+		if strings.EqualFold(reg.Accounts[i].Email, identifier) || strings.EqualFold(reg.Accounts[i].Label, identifier) {
 			reg.Accounts[i].Default = true
 			found = true
 		} else {
@@ -175,7 +175,7 @@ func (s *Store) GetCredentials(email string) (clientID, clientSecret string) {
 		return "", ""
 	}
 	for _, a := range reg.Accounts {
-		if a.Email == email {
+		if strings.EqualFold(a.Email, email) {
 			return a.ClientID, a.ClientSecret
 		}
 	}

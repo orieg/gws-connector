@@ -77,7 +77,7 @@ func OAuthFlow(ctx context.Context, clientID, clientSecret string) (*oauth2.Toke
 			errCh <- fmt.Errorf("OAuth error: %s — %s", errMsg, r.URL.Query().Get("error_description"))
 			w.Header().Set("Content-Type", "text/html")
 			fmt.Fprint(w, oauthPageHTML("Authorization Failed",
-				fmt.Sprintf("Error: %s", html.EscapeString(errMsg)),
+				fmt.Sprintf("Error: %s", errMsg),
 				true))
 			return
 		}
@@ -225,7 +225,7 @@ func oauthPageHTML(title, message string, isError bool) string {
   <p class="hint">GWS Connector for Claude Code</p>
 </div>
 </body>
-</html>`, html.EscapeString(title), color, icon, html.EscapeString(title), message)
+</html>`, html.EscapeString(title), color, icon, html.EscapeString(title), html.EscapeString(message))
 }
 
 // BuildOAuth2Config creates an oauth2.Config for the given credentials.
