@@ -8,8 +8,8 @@ import (
 func setupRouter(t *testing.T) (*Router, *Store) {
 	t.Helper()
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
-	store.Add("bob@work.com", "work", "Bob", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
+	store.Add("bob@work.com", "work", "Bob", "")
 	store.SetDefault("personal")
 	return NewRouter(store), store
 }

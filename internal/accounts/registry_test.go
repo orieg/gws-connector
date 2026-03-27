@@ -29,7 +29,7 @@ func TestLoadEmptyReturnsEmptyRegistry(t *testing.T) {
 func TestAddFirstAccountIsDefault(t *testing.T) {
 	store := tempStore(t)
 
-	err := store.Add("alice@example.com", "personal", "Alice", "", "")
+	err := store.Add("alice@example.com", "personal", "Alice", "")
 	if err != nil {
 		t.Fatalf("Add() error: %v", err)
 	}
@@ -51,8 +51,8 @@ func TestAddFirstAccountIsDefault(t *testing.T) {
 
 func TestAddSecondAccountIsNotDefault(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
-	store.Add("bob@work.com", "work", "Bob", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
+	store.Add("bob@work.com", "work", "Bob", "")
 
 	reg, _ := store.Load()
 	if len(reg.Accounts) != 2 {
@@ -68,9 +68,9 @@ func TestAddSecondAccountIsNotDefault(t *testing.T) {
 
 func TestAddDuplicateEmailReturnsError(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
-	err := store.Add("alice@example.com", "work", "Alice Work", "", "")
+	err := store.Add("alice@example.com", "work", "Alice Work", "")
 	if err != ErrAccountExists {
 		t.Errorf("expected ErrAccountExists, got %v", err)
 	}
@@ -78,9 +78,9 @@ func TestAddDuplicateEmailReturnsError(t *testing.T) {
 
 func TestAddDuplicateLabelReturnsError(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
-	err := store.Add("bob@example.com", "personal", "Bob", "", "")
+	err := store.Add("bob@example.com", "personal", "Bob", "")
 	if err != ErrLabelInUse {
 		t.Errorf("expected ErrLabelInUse, got %v", err)
 	}
@@ -88,7 +88,7 @@ func TestAddDuplicateLabelReturnsError(t *testing.T) {
 
 func TestAddSetsRoutingRule(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
 	reg, _ := store.Load()
 	email, ok := reg.RoutingRules.Domains["example.com"]
@@ -100,22 +100,22 @@ func TestAddSetsRoutingRule(t *testing.T) {
 	}
 }
 
-func TestAddWithPerAccountCredentials(t *testing.T) {
+func TestAddWithPerAccountClientID(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@corp.com", "work", "Alice", "corp-client-id", "corp-secret")
+	store.Add("alice@corp.com", "work", "Alice", "corp-client-id")
 
 	reg, _ := store.Load()
 	if reg.Accounts[0].ClientID != "corp-client-id" {
 		t.Errorf("expected corp-client-id, got %s", reg.Accounts[0].ClientID)
 	}
-	if reg.Accounts[0].ClientSecret != "corp-secret" {
-		t.Errorf("expected corp-secret, got %s", reg.Accounts[0].ClientSecret)
+	if reg.Accounts[0].ClientSecret != "" {
+		t.Errorf("expected empty clientSecret (stored in keychain), got %s", reg.Accounts[0].ClientSecret)
 	}
 }
 
 func TestAddWithoutPerAccountCredentials(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
 	reg, _ := store.Load()
 	if reg.Accounts[0].ClientID != "" {
@@ -125,8 +125,8 @@ func TestAddWithoutPerAccountCredentials(t *testing.T) {
 
 func TestRemoveByLabel(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
-	store.Add("bob@work.com", "work", "Bob", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
+	store.Add("bob@work.com", "work", "Bob", "")
 
 	err := store.Remove("work")
 	if err != nil {
@@ -144,7 +144,7 @@ func TestRemoveByLabel(t *testing.T) {
 
 func TestRemoveByEmail(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
 	err := store.Remove("alice@example.com")
 	if err != nil {
@@ -167,8 +167,8 @@ func TestRemoveNotFoundReturnsError(t *testing.T) {
 
 func TestRemoveDefaultPromotesNext(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
-	store.Add("bob@work.com", "work", "Bob", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
+	store.Add("bob@work.com", "work", "Bob", "")
 
 	store.Remove("personal")
 
@@ -183,7 +183,7 @@ func TestRemoveDefaultPromotesNext(t *testing.T) {
 
 func TestRemoveCleansUpRoutingRule(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 	store.Remove("personal")
 
 	reg, _ := store.Load()
@@ -194,8 +194,8 @@ func TestRemoveCleansUpRoutingRule(t *testing.T) {
 
 func TestSetDefault(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
-	store.Add("bob@work.com", "work", "Bob", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
+	store.Add("bob@work.com", "work", "Bob", "")
 
 	err := store.SetDefault("work")
 	if err != nil {
@@ -213,8 +213,8 @@ func TestSetDefault(t *testing.T) {
 
 func TestSetDefaultByEmail(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
-	store.Add("bob@work.com", "work", "Bob", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
+	store.Add("bob@work.com", "work", "Bob", "")
 
 	store.SetDefault("bob@work.com")
 
@@ -226,7 +226,7 @@ func TestSetDefaultByEmail(t *testing.T) {
 
 func TestSetDefaultNotFound(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
 	err := store.SetDefault("nonexistent")
 	if err != ErrAccountNotFound {
@@ -236,8 +236,8 @@ func TestSetDefaultNotFound(t *testing.T) {
 
 func TestGetDefault(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
-	store.Add("bob@work.com", "work", "Bob", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
+	store.Add("bob@work.com", "work", "Bob", "")
 
 	acct, err := store.GetDefault()
 	if err != nil {
@@ -256,34 +256,63 @@ func TestGetDefaultNoAccounts(t *testing.T) {
 	}
 }
 
-func TestGetCredentials(t *testing.T) {
+func TestGetClientID(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
-	store.Add("bob@corp.com", "work", "Bob", "corp-id", "corp-secret")
+	store.Add("alice@example.com", "personal", "Alice", "")
+	store.Add("bob@corp.com", "work", "Bob", "corp-id")
 
-	// Account without custom creds
-	cid, csec := store.GetCredentials("alice@example.com")
-	if cid != "" || csec != "" {
-		t.Errorf("expected empty credentials for alice, got %s/%s", cid, csec)
+	// Account without custom client ID
+	cid := store.GetClientID("alice@example.com")
+	if cid != "" {
+		t.Errorf("expected empty client ID for alice, got %s", cid)
 	}
 
-	// Account with custom creds
-	cid, csec = store.GetCredentials("bob@corp.com")
-	if cid != "corp-id" || csec != "corp-secret" {
-		t.Errorf("expected corp-id/corp-secret, got %s/%s", cid, csec)
+	// Account with custom client ID
+	cid = store.GetClientID("bob@corp.com")
+	if cid != "corp-id" {
+		t.Errorf("expected corp-id, got %s", cid)
 	}
 
 	// Unknown account
-	cid, csec = store.GetCredentials("unknown@example.com")
-	if cid != "" || csec != "" {
-		t.Error("expected empty credentials for unknown account")
+	cid = store.GetClientID("unknown@example.com")
+	if cid != "" {
+		t.Errorf("expected empty client ID for unknown account, got %s", cid)
+	}
+}
+
+func TestMigrateClientSecrets(t *testing.T) {
+	store := tempStore(t)
+
+	// Simulate legacy format by writing directly to registry
+	reg := &Registry{
+		Accounts: []Account{
+			{Email: "alice@example.com", Label: "personal", ClientID: "id-1", ClientSecret: "secret-1"},
+			{Email: "bob@work.com", Label: "work", ClientID: "id-2", ClientSecret: ""},
+		},
+		RoutingRules: RoutingRules{Domains: map[string]string{}},
+	}
+	store.Save(reg)
+
+	toMigrate := store.MigrateClientSecrets()
+	if len(toMigrate) != 1 {
+		t.Fatalf("expected 1 account to migrate, got %d", len(toMigrate))
+	}
+	if toMigrate[0].Email != "alice@example.com" {
+		t.Errorf("expected alice, got %s", toMigrate[0].Email)
+	}
+
+	// Clear the secret
+	store.ClearClientSecret("alice@example.com")
+	reg, _ = store.Load()
+	if reg.Accounts[0].ClientSecret != "" {
+		t.Errorf("expected empty ClientSecret after clear, got %s", reg.Accounts[0].ClientSecret)
 	}
 }
 
 func TestSaveAndLoadPersistence(t *testing.T) {
 	dir := t.TempDir()
 	store1 := NewStore(dir)
-	store1.Add("alice@example.com", "personal", "Alice", "", "")
+	store1.Add("alice@example.com", "personal", "Alice", "")
 
 	// Create a new store pointing to same dir
 	store2 := NewStore(dir)
@@ -298,7 +327,7 @@ func TestSaveAndLoadPersistence(t *testing.T) {
 
 func TestFilePermissions(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
 	path := filepath.Join(store.stateDir, "accounts.json")
 	info, err := os.Stat(path)
@@ -313,9 +342,9 @@ func TestFilePermissions(t *testing.T) {
 
 func TestAddDuplicateEmailCaseInsensitive(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
-	err := store.Add("Alice@Example.COM", "other", "Alice 2", "", "")
+	err := store.Add("Alice@Example.COM", "other", "Alice 2", "")
 	if err != ErrAccountExists {
 		t.Errorf("expected ErrAccountExists for case-different email, got %v", err)
 	}
@@ -323,9 +352,9 @@ func TestAddDuplicateEmailCaseInsensitive(t *testing.T) {
 
 func TestAddDuplicateLabelCaseInsensitive(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
-	err := store.Add("bob@work.com", "Personal", "Bob", "", "")
+	err := store.Add("bob@work.com", "Personal", "Bob", "")
 	if err != ErrLabelInUse {
 		t.Errorf("expected ErrLabelInUse for case-different label, got %v", err)
 	}
@@ -333,8 +362,8 @@ func TestAddDuplicateLabelCaseInsensitive(t *testing.T) {
 
 func TestAddSameDomainDoesNotOverwriteRoutingRule(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
-	store.Add("bob@example.com", "work", "Bob", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
+	store.Add("bob@example.com", "work", "Bob", "")
 
 	reg, _ := store.Load()
 	email, ok := reg.RoutingRules.Domains["example.com"]
@@ -348,7 +377,7 @@ func TestAddSameDomainDoesNotOverwriteRoutingRule(t *testing.T) {
 
 func TestAddDomainRoutingNormalizesCase(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@Example.COM", "personal", "Alice", "", "")
+	store.Add("alice@Example.COM", "personal", "Alice", "")
 
 	reg, _ := store.Load()
 	if _, ok := reg.RoutingRules.Domains["example.com"]; !ok {
@@ -361,7 +390,7 @@ func TestAddDomainRoutingNormalizesCase(t *testing.T) {
 
 func TestServicesField(t *testing.T) {
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "", "")
+	store.Add("alice@example.com", "personal", "Alice", "")
 
 	reg, _ := store.Load()
 	services := reg.Accounts[0].Services

@@ -6,23 +6,25 @@ import (
 
 // mockAccountCreds implements AccountCredentials for testing.
 type mockAccountCreds struct {
-	creds map[string][2]string // email -> {clientID, clientSecret}
+	clientIDs map[string]string // email -> clientID
 }
 
-func (m *mockAccountCreds) GetCredentials(email string) (string, string) {
-	if c, ok := m.creds[email]; ok {
-		return c[0], c[1]
+func (m *mockAccountCreds) GetClientID(email string) string {
+	if id, ok := m.clientIDs[email]; ok {
+		return id
 	}
-	return "", ""
+	return ""
 }
 
 func TestCredentialsForAccountUsesPerAccount(t *testing.T) {
 	ts := newFileTokenStore(t)
 	creds := &mockAccountCreds{
-		creds: map[string][2]string{
-			"bob@corp.com": {"corp-id", "corp-secret"},
+		clientIDs: map[string]string{
+			"bob@corp.com": "corp-id",
 		},
 	}
+	// Store client secret in token store (keychain/file)
+	ts.SaveClientSecret("bob@corp.com", "corp-secret")
 
 	factory := NewClientFactory(ts, "global-id", "global-secret", creds)
 
@@ -35,7 +37,7 @@ func TestCredentialsForAccountUsesPerAccount(t *testing.T) {
 func TestCredentialsForAccountFallsBackToGlobal(t *testing.T) {
 	ts := newFileTokenStore(t)
 	creds := &mockAccountCreds{
-		creds: map[string][2]string{},
+		clientIDs: map[string]string{},
 	}
 
 	factory := NewClientFactory(ts, "global-id", "global-secret", creds)
@@ -58,10 +60,10 @@ func TestCredentialsForAccountNilAccountCreds(t *testing.T) {
 
 func TestCredentialsForAccountPartialPerAccountFallsBack(t *testing.T) {
 	ts := newFileTokenStore(t)
-	// Per-account has clientID but empty clientSecret
+	// Per-account has clientID but no client secret in keychain
 	creds := &mockAccountCreds{
-		creds: map[string][2]string{
-			"partial@corp.com": {"corp-id", ""},
+		clientIDs: map[string]string{
+			"partial@corp.com": "corp-id",
 		},
 	}
 
@@ -77,11 +79,13 @@ func TestCredentialsForAccountPartialPerAccountFallsBack(t *testing.T) {
 func TestCredentialsMultipleAccounts(t *testing.T) {
 	ts := newFileTokenStore(t)
 	creds := &mockAccountCreds{
-		creds: map[string][2]string{
-			"alice@corpA.com": {"corpA-id", "corpA-secret"},
-			"bob@corpB.com":   {"corpB-id", "corpB-secret"},
+		clientIDs: map[string]string{
+			"alice@corpA.com": "corpA-id",
+			"bob@corpB.com":   "corpB-id",
 		},
 	}
+	ts.SaveClientSecret("alice@corpA.com", "corpA-secret")
+	ts.SaveClientSecret("bob@corpB.com", "corpB-secret")
 
 	factory := NewClientFactory(ts, "global-id", "global-secret", creds)
 

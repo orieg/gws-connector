@@ -68,9 +68,10 @@ func (s *Store) Save(reg *Registry) error {
 	return nil
 }
 
-// Add registers a new account. clientID/clientSecret are optional per-account
-// OAuth credentials that override the global ones. Pass empty strings to use global.
-func (s *Store) Add(email, label, displayName, clientID, clientSecret string) error {
+// Add registers a new account. clientID is the optional per-account OAuth client ID
+// that overrides the global one. Pass empty string to use global.
+// Client secrets are stored separately in the OS keychain (see TokenStore).
+func (s *Store) Add(email, label, displayName, clientID string) error {
 	reg, err := s.Load()
 	if err != nil {
 		return err
@@ -87,14 +88,13 @@ func (s *Store) Add(email, label, displayName, clientID, clientSecret string) er
 
 	isDefault := len(reg.Accounts) == 0
 	reg.Accounts = append(reg.Accounts, Account{
-		Email:        email,
-		Label:        label,
-		DisplayName:  displayName,
-		AddedAt:      time.Now().UTC().Format(time.RFC3339),
-		Services:     []string{"mail", "calendar", "drive"},
-		Default:      isDefault,
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
+		Email:       email,
+		Label:       label,
+		DisplayName: displayName,
+		AddedAt:     time.Now().UTC().Format(time.RFC3339),
+		Services:    []string{"mail", "calendar", "drive"},
+		Default:     isDefault,
+		ClientID:    clientID,
 	})
 
 	// Add domain routing rule (only if no rule exists for this domain yet).
@@ -169,19 +169,52 @@ func (s *Store) SetDefault(identifier string) error {
 	return s.Save(reg)
 }
 
-// GetCredentials returns per-account OAuth credentials. Returns empty strings
-// if the account has no custom credentials (caller should fall back to global).
-func (s *Store) GetCredentials(email string) (clientID, clientSecret string) {
+// GetClientID returns the per-account OAuth client ID. Returns empty string
+// if the account has no custom client ID (caller should fall back to global).
+func (s *Store) GetClientID(email string) string {
 	reg, err := s.Load()
 	if err != nil {
-		return "", ""
+		return ""
 	}
 	for _, a := range reg.Accounts {
 		if strings.EqualFold(a.Email, email) {
-			return a.ClientID, a.ClientSecret
+			return a.ClientID
 		}
 	}
-	return "", ""
+	return ""
+}
+
+// MigrateClientSecrets returns accounts that have a ClientSecret stored in the
+// registry (legacy format). Caller should migrate these to the keychain and
+// then call ClearClientSecret to remove them from the JSON file.
+func (s *Store) MigrateClientSecrets() []Account {
+	reg, err := s.Load()
+	if err != nil {
+		return nil
+	}
+	var toMigrate []Account
+	for _, a := range reg.Accounts {
+		if a.ClientSecret != "" {
+			toMigrate = append(toMigrate, a)
+		}
+	}
+	return toMigrate
+}
+
+// ClearClientSecret removes the legacy ClientSecret field from an account
+// in the registry and re-saves.
+func (s *Store) ClearClientSecret(email string) error {
+	reg, err := s.Load()
+	if err != nil {
+		return err
+	}
+	for i := range reg.Accounts {
+		if strings.EqualFold(reg.Accounts[i].Email, email) {
+			reg.Accounts[i].ClientSecret = ""
+			return s.Save(reg)
+		}
+	}
+	return nil
 }
 
 // GetDefault returns the default account.
