@@ -1,8 +1,6 @@
 ---
 name: remove-account
 description: Disconnect a Google account from the GWS connector and delete its tokens.
-command: gws:remove-account
-args: "<label-or-email>"
 ---
 
 # Remove Account

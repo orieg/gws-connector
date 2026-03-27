@@ -1,7 +1,6 @@
 ---
 name: configure
 description: Step-by-step setup wizard for the GWS connector. Walks through creating a GCP project, getting OAuth credentials, and connecting accounts.
-command: gws:configure
 ---
 
 # GWS Configure
