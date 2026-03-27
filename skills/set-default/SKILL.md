@@ -1,6 +1,6 @@
 ---
 name: set-default
-description: Set which Google account is used by default when no account is specified.
+description: Set the default GWS account used when no account is specified.
 ---
 
 # Set Default Account
