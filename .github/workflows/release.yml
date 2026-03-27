@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binaries
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          LDFLAGS="-s -w -X main.version=${VERSION}"
+          BINARY=gws-mcp
+
+          GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o "${BINARY}-darwin-arm64" ./cmd/gws-mcp
+          GOOS=darwin GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o "${BINARY}-darwin-amd64" ./cmd/gws-mcp
+          GOOS=linux  GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o "${BINARY}-linux-amd64"  ./cmd/gws-mcp
+          GOOS=linux  GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o "${BINARY}-linux-arm64"  ./cmd/gws-mcp
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            gws-mcp-darwin-arm64
+            gws-mcp-darwin-amd64
+            gws-mcp-linux-amd64
+            gws-mcp-linux-arm64

@@ -21,24 +21,50 @@ Most AI coding assistants support a single Google account. If you use multiple G
 
 ### Prerequisites
 
-- Go 1.21+ installed
 - A Google Cloud project with OAuth credentials ([setup guide below](#google-cloud-setup))
 
-### Build
+### Install
+
+**Option A — Download prebuilt binary (no Go required):**
+
+```bash
+# macOS (Apple Silicon)
+curl -Lo gws-mcp https://github.com/orieg/gws-connector/releases/latest/download/gws-mcp-darwin-arm64
+chmod +x gws-mcp
+
+# macOS (Intel)
+curl -Lo gws-mcp https://github.com/orieg/gws-connector/releases/latest/download/gws-mcp-darwin-amd64
+chmod +x gws-mcp
+
+# Linux (x86_64)
+curl -Lo gws-mcp https://github.com/orieg/gws-connector/releases/latest/download/gws-mcp-linux-amd64
+chmod +x gws-mcp
+
+# Linux (ARM64)
+curl -Lo gws-mcp https://github.com/orieg/gws-connector/releases/latest/download/gws-mcp-linux-arm64
+chmod +x gws-mcp
+```
+
+**Option B — Build from source (requires Go 1.25+):**
 
 ```bash
 git clone https://github.com/orieg/gws-connector
 cd gws-connector
 make build
+# Binary is at ./bin/gws-mcp
 ```
 
 ### Configure credentials
+
+Set your default OAuth credentials as environment variables:
 
 ```bash
 # Add to ~/.zshrc or ~/.bashrc
 export GWS_GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 export GWS_GOOGLE_CLIENT_SECRET="your-client-secret"
 ```
+
+These are used for all accounts by default. If you connect accounts from different Google Workspace organizations, you can provide per-account credentials when adding each account — see [Multiple organizations](#multiple-organizations).
 
 ### Install per platform
 
@@ -76,7 +102,7 @@ Or add manually to your VS Code settings:
   "mcp": {
     "servers": {
       "gws-connector": {
-        "command": "/path/to/gws-connector/bin/gws-mcp",
+        "command": "/path/to/gws-mcp",
         "env": {
           "GWS_GOOGLE_CLIENT_ID": "your-client-id",
           "GWS_GOOGLE_CLIENT_SECRET": "your-secret"
@@ -100,7 +126,7 @@ Or add manually via **Settings → MCP Servers → Add**:
 {
   "mcpServers": {
     "gws-connector": {
-      "command": "/path/to/gws-connector/bin/gws-mcp",
+      "command": "/path/to/gws-mcp",
       "env": {
         "GWS_GOOGLE_CLIENT_ID": "your-client-id",
         "GWS_GOOGLE_CLIENT_SECRET": "your-secret"
@@ -121,7 +147,7 @@ Add to your `codex.json` (the repo includes one):
 {
   "mcpServers": {
     "gws-connector": {
-      "command": "/path/to/gws-connector/bin/gws-mcp",
+      "command": "/path/to/gws-mcp",
       "env": {
         "GWS_GOOGLE_CLIENT_ID": "your-client-id",
         "GWS_GOOGLE_CLIENT_SECRET": "your-secret"
@@ -139,7 +165,7 @@ Add to your `codex.json` (the repo includes one):
 The `gws-mcp` binary is a standard MCP server speaking JSON-RPC over stdio. Point your client to:
 
 ```
-./bin/gws-mcp [--use-dot-names]
+gws-mcp [--use-dot-names]
 ```
 
 Environment variables:
@@ -161,7 +187,7 @@ gws.accounts.add(label: "personal")
 /gws:add-account
 ```
 
-This opens a browser for Google OAuth. The first account becomes the default. Add more by running the command again.
+This opens a browser for Google OAuth. The first account becomes the default. Add more by running the command again with a different label.
 
 ## Usage
 
@@ -239,6 +265,8 @@ If you connect accounts from different Google Workspace orgs, each org may need 
 gws.accounts.add(label: "work", clientId: "org-client-id", clientSecret: "org-secret")
 ```
 
+Accounts that don't specify credentials will use the global `GWS_GOOGLE_CLIENT_ID` / `GWS_GOOGLE_CLIENT_SECRET` environment variables.
+
 ## Architecture
 
 ```
@@ -270,7 +298,7 @@ gws-connector/
 
 ```bash
 make build          # Build binary
-make test           # Run tests (56 tests across 4 packages)
+make test           # Run tests with race detector
 make test-verbose   # Run tests with verbose output
 make lint           # Run go vet
 make release        # Cross-compile for all platforms

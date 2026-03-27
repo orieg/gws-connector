@@ -8,9 +8,18 @@ import (
 	"github.com/orieg/gws-connector/internal/server"
 )
 
+// version is set via ldflags at build time (e.g., -X main.version=v0.1.0).
+var version = "dev"
+
 func main() {
 	useDotNames := flag.Bool("use-dot-names", false, "Use dot-separated tool names (gws.mail.search) instead of underscores")
+	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		os.Exit(0)
+	}
 
 	stateDir := os.Getenv("GWS_STATE_DIR")
 	if stateDir == "" {
