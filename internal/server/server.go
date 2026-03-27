@@ -171,11 +171,13 @@ func (s *Server) handleAccountsAdd(ctx context.Context, req mcp.CallToolRequest)
 		return errorResult(fmt.Errorf("label is required")), nil
 	}
 
-	// Per-account credentials override global ones
-	clientID, _ := req.GetArguments()["clientId"].(string)
-	clientSecret, _ := req.GetArguments()["clientSecret"].(string)
+	// Capture original per-account credentials from request (before fallback)
+	reqClientID, _ := req.GetArguments()["clientId"].(string)
+	reqClientSecret, _ := req.GetArguments()["clientSecret"].(string)
 
-	// Fall back to global credentials if not provided per-account
+	// Resolve effective credentials: per-account → global fallback
+	clientID := reqClientID
+	clientSecret := reqClientSecret
 	if clientID == "" {
 		clientID = s.config.ClientID
 	}
@@ -208,11 +210,8 @@ func (s *Server) handleAccountsAdd(ctx context.Context, req mcp.CallToolRequest)
 		return errorResult(fmt.Errorf("saving client secret: %w", err)), nil
 	}
 
-	// Register account with client ID only (secret is in keychain)
-	perAcctID := ""
-	if clientID != s.config.ClientID {
-		perAcctID = clientID
-	}
+	// Register account — store per-account client ID if explicitly provided
+	perAcctID := reqClientID
 	if err := s.accountStore.Add(info.Email, label, info.DisplayName, perAcctID); err != nil {
 		return errorResult(fmt.Errorf("registering account: %w", err)), nil
 	}

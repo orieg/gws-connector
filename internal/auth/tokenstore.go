@@ -116,15 +116,20 @@ func (ts *TokenStore) LoadClientSecret(email string) (string, error) {
 }
 
 // DeleteClientSecret removes a per-account OAuth client secret.
-func (ts *TokenStore) DeleteClientSecret(email string) {
+func (ts *TokenStore) DeleteClientSecret(email string) error {
 	key := email + ":client_secret"
 	if !ts.useFileStorage {
-		keyring.Delete(keychainService, key)
+		if err := keyring.Delete(keychainService, key); err != nil {
+			log.Printf("gws-connector: failed to delete client secret from keychain for %s: %v", email, err)
+		}
 	}
 	path := ts.secretFilePath(email)
 	if _, err := os.Stat(path); err == nil {
-		os.Remove(path)
+		if err := os.Remove(path); err != nil {
+			return fmt.Errorf("removing client secret file for %s: %w", email, err)
+		}
 	}
+	return nil
 }
 
 func (ts *TokenStore) secretFilePath(email string) string {
