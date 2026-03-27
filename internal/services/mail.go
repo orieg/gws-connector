@@ -214,6 +214,89 @@ func (m *MailService) ListLabels(ctx context.Context, req mcp.CallToolRequest) (
 	return TextResult(sb.String()), nil
 }
 
+// CreateLabel creates a new Gmail label.
+func (m *MailService) CreateLabel(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	svc, acct, err := m.resolveAndGetService(ctx, req.GetArguments())
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	name, _ := req.GetArguments()["name"].(string)
+	if name == "" {
+		return ErrorResult(fmt.Errorf("name is required")), nil
+	}
+
+	label := &gmail.Label{
+		Name:                    name,
+		LabelListVisibility:     "labelShow",
+		MessageListVisibility:   "show",
+	}
+
+	// Optional color
+	bgColor, _ := req.GetArguments()["backgroundColor"].(string)
+	textColor, _ := req.GetArguments()["textColor"].(string)
+	if bgColor != "" || textColor != "" {
+		label.Color = &gmail.LabelColor{
+			BackgroundColor: bgColor,
+			TextColor:       textColor,
+		}
+	}
+
+	created, err := svc.Users.Labels.Create("me", label).Do()
+	if err != nil {
+		return ErrorResult(fmt.Errorf("creating label on %s: %w", acct.Label, err)), nil
+	}
+
+	return TextResult(fmt.Sprintf(
+		"Label created on %s (%s).\n  Name: %s\n  ID: %s",
+		acct.Label, acct.Email, created.Name, created.Id,
+	)), nil
+}
+
+// ModifyMessage adds or removes labels from a Gmail message.
+func (m *MailService) ModifyMessage(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	svc, acct, err := m.resolveAndGetService(ctx, req.GetArguments())
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	messageId, _ := req.GetArguments()["messageId"].(string)
+	if messageId == "" {
+		return ErrorResult(fmt.Errorf("messageId is required")), nil
+	}
+
+	modReq := &gmail.ModifyMessageRequest{}
+
+	if addLabels, ok := req.GetArguments()["addLabelIds"].([]any); ok {
+		for _, l := range addLabels {
+			if s, ok := l.(string); ok {
+				modReq.AddLabelIds = append(modReq.AddLabelIds, s)
+			}
+		}
+	}
+	if removeLabels, ok := req.GetArguments()["removeLabelIds"].([]any); ok {
+		for _, l := range removeLabels {
+			if s, ok := l.(string); ok {
+				modReq.RemoveLabelIds = append(modReq.RemoveLabelIds, s)
+			}
+		}
+	}
+
+	if len(modReq.AddLabelIds) == 0 && len(modReq.RemoveLabelIds) == 0 {
+		return ErrorResult(fmt.Errorf("at least one of addLabelIds or removeLabelIds is required")), nil
+	}
+
+	msg, err := svc.Users.Messages.Modify("me", messageId, modReq).Do()
+	if err != nil {
+		return ErrorResult(fmt.Errorf("modifying message on %s: %w", acct.Label, err)), nil
+	}
+
+	return TextResult(fmt.Sprintf(
+		"Message %s modified on %s (%s).\n  Labels: %s",
+		msg.Id, acct.Label, acct.Email, strings.Join(msg.LabelIds, ", "),
+	)), nil
+}
+
 // GetProfile returns Gmail profile info.
 func (m *MailService) GetProfile(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	svc, acct, err := m.resolveAndGetService(ctx, req.GetArguments())

@@ -318,6 +318,28 @@ func (s *Server) registerMailTools() {
 	)
 
 	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "mail", "create_label"),
+			mcp.WithDescription("Create a new Gmail label"),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Label name (e.g., 'Projects/Alpha')")),
+			mcp.WithString("backgroundColor", mcp.Description("Label background color hex (e.g., '#16a765')")),
+			mcp.WithString("textColor", mcp.Description("Label text color hex (e.g., '#ffffff')")),
+			accountParam,
+		),
+		s.mailSvc.CreateLabel,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "mail", "modify_message"),
+			mcp.WithDescription("Add or remove labels from a Gmail message (use for archiving, starring, marking read/unread, or applying custom labels)"),
+			mcp.WithString("messageId", mcp.Required(), mcp.Description("The message ID")),
+			mcp.WithArray("addLabelIds", mcp.Description("Label IDs to add (e.g., ['STARRED', 'Label_123'])")),
+			mcp.WithArray("removeLabelIds", mcp.Description("Label IDs to remove (e.g., ['INBOX', 'UNREAD'])")),
+			accountParam,
+		),
+		s.mailSvc.ModifyMessage,
+	)
+
+	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "get_profile"),
 			mcp.WithDescription("Get Gmail profile info (email, messages total, threads total)"),
 			accountParam,
