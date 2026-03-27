@@ -28,7 +28,7 @@ Tell the user:
 >
 > **2. Create a new project** (or select an existing one):
 >    - Click the project dropdown at the top → "New Project"
->    - Name it something like "Claude GWS Connector"
+>    - Name it something like "GWS Connector"
 >    - Click "Create"
 >
 > **3. Enable the required APIs** — go to each link and click "Enable":
@@ -37,65 +37,68 @@ Tell the user:
 >    - Google Drive API: https://console.cloud.google.com/apis/library/drive.googleapis.com
 >
 > **4. Configure the OAuth consent screen:**
->    - Go to: https://console.cloud.google.com/apis/credentials/consent
+>    - Go to: https://console.cloud.google.com/auth/consent
 >    - Choose "External" (unless you have a Google Workspace org and want "Internal")
 >    - Fill in the app name (e.g., "Claude GWS") and your email for support contact
->    - On the "Scopes" page, add these scopes:
+>    - Click "Save"
+>
+> **5. Add scopes** — go to the Data Access tab:
+>    - Go to: https://console.cloud.google.com/auth/scopes
+>    - Click "Add or Remove Scopes"
+>    - In the panel that opens, paste these scopes into the "Manually add scopes" box at the bottom (one at a time or comma-separated):
 >      - `https://www.googleapis.com/auth/gmail.modify`
 >      - `https://www.googleapis.com/auth/calendar`
 >      - `https://www.googleapis.com/auth/drive`
 >      - `https://www.googleapis.com/auth/userinfo.email`
 >      - `https://www.googleapis.com/auth/userinfo.profile`
->    - On "Test users", add your Google email address(es)
->    - Save and continue
+>    - Click "Update" to confirm, then "Save"
 >
-> **5. Create OAuth credentials:**
->    - Go to: https://console.cloud.google.com/apis/credentials
->    - Click "+ Create Credentials" → "OAuth client ID"
+> **6. Add test users:**
+>    - Go to: https://console.cloud.google.com/auth/audience
+>    - Add each Google email address you plan to connect
+>
+> **7. Create OAuth credentials:**
+>    - Go to: https://console.cloud.google.com/auth/clients
+>    - Click "+ Create Client" → "OAuth client ID"
 >    - Application type: **Desktop app**
 >    - Name it (e.g., "Claude GWS Desktop")
 >    - Click "Create"
->    - **Copy the Client ID and Client Secret** that appear
+>    - **Download the JSON file** (click the download icon next to your new client)
 
-Ask the user to provide the Client ID and Client Secret once they have them.
+Ask the user to share or point to the downloaded JSON file, or provide the Client ID and Client Secret directly.
 
-### 2b. Configure credentials
+### 2b. Read credentials from JSON file
 
-Once the user provides credentials, explain the two ways to set them:
+If the user provides a path to the downloaded `client_secret_*.json` file:
 
-**Option A — Environment variables (recommended for a single GCP project):**
+1. Read the file to extract `client_id` and `client_secret` from the `installed` object
+2. The JSON structure looks like: `{"installed": {"client_id": "...", "client_secret": "..."}}`
+3. Use these values when calling `gws.accounts.add`
 
-```bash
-# Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
-export GWS_GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export GWS_GOOGLE_CLIENT_SECRET="your-client-secret"
-```
+If the user provides Client ID and Client Secret directly as text, use those.
 
-Then restart Claude Code for the env vars to take effect.
-
-**Option B — Per-account credentials (for different organizations):**
-
-If different accounts belong to different Google Workspace organizations, each org may need its own GCP project. In this case, pass `clientId` and `clientSecret` directly when adding each account:
-
-```
-gws.accounts.add(label: "work", clientId: "work-client-id", clientSecret: "work-secret")
-gws.accounts.add(label: "personal", clientId: "personal-client-id", clientSecret: "personal-secret")
-```
-
-This way each account uses its own org's OAuth app.
+**Important:** Do NOT suggest setting environment variables. Credentials are stored per-account in the OS keychain — no env vars needed.
 
 ## Step 3: Connect accounts
 
-Once credentials are configured, help the user add their first account:
+Once credentials are available, help the user add their first account:
 
 1. Ask what label they want (e.g., "personal", "work", "client-name")
-2. Call `gws.accounts.add` with the label (and per-account credentials if provided)
+2. Call `gws.accounts.add` with the label, clientId, and clientSecret
 3. This opens a browser — tell the user to authorize access
-4. Confirm success
+4. Confirm success — the client secret is now stored in the OS keychain
 
 Then ask: "Would you like to connect another account? Each account can use different OAuth credentials if it belongs to a different organization."
 
-## Step 4: Coexistence note
+## Step 4: Multiple organizations
+
+If the user wants to connect accounts from different Google Workspace organizations:
+
+- Each org needs its own GCP project with its own OAuth credentials
+- Repeat Steps 2-3 for each org's GCP project
+- Each account stores its own credentials independently in the keychain
+
+## Step 5: Coexistence note
 
 If the user already has Claude's built-in Google Calendar or Gmail connectors:
 
@@ -106,3 +109,4 @@ If the user already has Claude's built-in Google Calendar or Gmail connectors:
 - For Google Workspace (business) accounts, the Workspace admin may need to approve the OAuth app
 - The "External" consent screen in testing mode allows up to 100 test users — add each Google email you plan to connect
 - To publish the app (remove the "unverified" warning), you'd need to submit for Google verification — not needed for personal/testing use
+- Client secrets are stored in the OS keychain (macOS Keychain, GNOME Keyring) — never in plain text config files
