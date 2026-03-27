@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -58,8 +59,24 @@ func New(cfg Config) *Server {
 		mcpserver.WithToolCapabilities(true),
 	)
 
+	s.migrateClientSecrets()
 	s.registerTools()
 	return s
+}
+
+// migrateClientSecrets moves any client secrets from accounts.json (legacy)
+// into the OS keychain. This handles upgrades from older versions.
+func (s *Server) migrateClientSecrets() {
+	toMigrate := s.accountStore.MigrateClientSecrets()
+	for _, acct := range toMigrate {
+		if err := s.tokenStore.SaveClientSecret(acct.Email, acct.ClientSecret); err != nil {
+			fmt.Fprintf(os.Stderr, "gws-connector: failed to migrate client secret for %s to keychain: %v\n", acct.Email, err)
+			continue
+		}
+		if err := s.accountStore.ClearClientSecret(acct.Email); err != nil {
+			fmt.Fprintf(os.Stderr, "gws-connector: failed to clear migrated client secret for %s: %v\n", acct.Email, err)
+		}
+	}
 }
 
 // toolName applies dot-naming if configured.
@@ -186,13 +203,17 @@ func (s *Server) handleAccountsAdd(ctx context.Context, req mcp.CallToolRequest)
 		return errorResult(fmt.Errorf("saving token: %w", err)), nil
 	}
 
-	// Register account with per-account credentials (empty strings if using global)
-	perAcctID, perAcctSec := "", ""
+	// Store client secret in keychain (not in accounts.json)
+	if err := s.tokenStore.SaveClientSecret(info.Email, clientSecret); err != nil {
+		return errorResult(fmt.Errorf("saving client secret: %w", err)), nil
+	}
+
+	// Register account with client ID only (secret is in keychain)
+	perAcctID := ""
 	if clientID != s.config.ClientID {
 		perAcctID = clientID
-		perAcctSec = clientSecret
 	}
-	if err := s.accountStore.Add(info.Email, label, info.DisplayName, perAcctID, perAcctSec); err != nil {
+	if err := s.accountStore.Add(info.Email, label, info.DisplayName, perAcctID); err != nil {
 		return errorResult(fmt.Errorf("registering account: %w", err)), nil
 	}
 
@@ -219,8 +240,9 @@ func (s *Server) handleAccountsRemove(ctx context.Context, req mcp.CallToolReque
 		return errorResult(err), nil
 	}
 
-	// Delete token
+	// Delete token and client secret from keychain
 	s.tokenStore.Delete(acct.Email)
+	s.tokenStore.DeleteClientSecret(acct.Email)
 
 	// Remove from registry
 	if err := s.accountStore.Remove(account); err != nil {

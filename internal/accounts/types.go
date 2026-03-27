@@ -8,8 +8,11 @@ type Account struct {
 	AddedAt      string   `json:"addedAt"`
 	Services     []string `json:"services"`
 	Default      bool     `json:"default"`
-	ClientID     string   `json:"clientId,omitempty"`     // per-account OAuth client ID (overrides global)
-	ClientSecret string   `json:"clientSecret,omitempty"` // per-account OAuth client secret (overrides global)
+	ClientID     string   `json:"clientId,omitempty"` // per-account OAuth client ID (overrides global)
+
+	// Deprecated: client secrets are now stored in the OS keychain.
+	// This field is retained for migration from older versions.
+	ClientSecret string `json:"clientSecret,omitempty"`
 }
 
 // RoutingRules defines automatic account selection rules.

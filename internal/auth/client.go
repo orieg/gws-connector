@@ -13,11 +13,11 @@ import (
 	"google.golang.org/api/option"
 )
 
-// AccountCredentials provides per-account OAuth credentials lookup.
+// AccountCredentials provides per-account OAuth client ID lookup.
 type AccountCredentials interface {
-	// GetCredentials returns the OAuth client ID and secret for the given email.
-	// Returns empty strings if no per-account credentials are set.
-	GetCredentials(email string) (clientID, clientSecret string)
+	// GetClientID returns the per-account OAuth client ID for the given email.
+	// Returns empty string if no per-account client ID is set.
+	GetClientID(email string) string
 }
 
 // ClientFactory creates authenticated Google API service clients for accounts.
@@ -40,14 +40,21 @@ func NewClientFactory(tokenStore *TokenStore, clientID, clientSecret string, acc
 }
 
 // credentialsForAccount returns the OAuth client ID and secret to use for
-// the given account. Per-account credentials take priority over global.
+// the given account. Per-account credentials (keychain) take priority over global.
 func (f *ClientFactory) credentialsForAccount(email string) (string, string) {
+	// Try per-account client ID from registry
+	clientID := ""
 	if f.accountCreds != nil {
-		cid, csec := f.accountCreds.GetCredentials(email)
-		if cid != "" && csec != "" {
-			return cid, csec
-		}
+		clientID = f.accountCreds.GetClientID(email)
 	}
+
+	// Try per-account client secret from keychain
+	clientSecret, _ := f.tokenStore.LoadClientSecret(email)
+
+	if clientID != "" && clientSecret != "" {
+		return clientID, clientSecret
+	}
+
 	return f.globalClientID, f.globalClientSec
 }
 

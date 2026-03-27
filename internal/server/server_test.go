@@ -53,8 +53,8 @@ func TestHandleAccountsListWithAccounts(t *testing.T) {
 	s := testServer(t)
 
 	// Add accounts directly via store
-	s.accountStore.Add("alice@example.com", "personal", "Alice", "", "")
-	s.accountStore.Add("bob@work.com", "work", "Bob", "", "")
+	s.accountStore.Add("alice@example.com", "personal", "Alice", "")
+	s.accountStore.Add("bob@work.com", "work", "Bob", "")
 
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]any{}
@@ -158,7 +158,7 @@ func TestHandleAccountsRemoveNotFound(t *testing.T) {
 
 func TestHandleAccountsRemoveSuccess(t *testing.T) {
 	s := testServer(t)
-	s.accountStore.Add("alice@example.com", "personal", "Alice", "", "")
+	s.accountStore.Add("alice@example.com", "personal", "Alice", "")
 
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]any{"account": "personal"}
@@ -181,8 +181,8 @@ func TestHandleAccountsRemoveSuccess(t *testing.T) {
 
 func TestHandleAccountsSetDefaultSuccess(t *testing.T) {
 	s := testServer(t)
-	s.accountStore.Add("alice@example.com", "personal", "Alice", "", "")
-	s.accountStore.Add("bob@work.com", "work", "Bob", "", "")
+	s.accountStore.Add("alice@example.com", "personal", "Alice", "")
+	s.accountStore.Add("bob@work.com", "work", "Bob", "")
 
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]any{"account": "work"}

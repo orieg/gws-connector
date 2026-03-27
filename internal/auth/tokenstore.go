@@ -90,14 +90,76 @@ func (ts *TokenStore) Delete(email string) error {
 	return nil
 }
 
+// SaveClientSecret stores a per-account OAuth client secret in the keychain.
+func (ts *TokenStore) SaveClientSecret(email, secret string) error {
+	key := email + ":client_secret"
+	if ts.useFileStorage {
+		return ts.saveSecretToFile(email, secret)
+	}
+	if err := keyring.Set(keychainService, key, secret); err != nil {
+		return ts.saveSecretToFile(email, secret)
+	}
+	return nil
+}
+
+// LoadClientSecret retrieves a per-account OAuth client secret.
+func (ts *TokenStore) LoadClientSecret(email string) (string, error) {
+	key := email + ":client_secret"
+	if ts.useFileStorage {
+		return ts.loadSecretFromFile(email)
+	}
+	secret, err := keyring.Get(keychainService, key)
+	if err != nil {
+		return ts.loadSecretFromFile(email)
+	}
+	return secret, nil
+}
+
+// DeleteClientSecret removes a per-account OAuth client secret.
+func (ts *TokenStore) DeleteClientSecret(email string) {
+	key := email + ":client_secret"
+	if !ts.useFileStorage {
+		keyring.Delete(keychainService, key)
+	}
+	path := ts.secretFilePath(email)
+	if _, err := os.Stat(path); err == nil {
+		os.Remove(path)
+	}
+}
+
+func (ts *TokenStore) secretFilePath(email string) string {
+	safe := sanitizeEmail(email)
+	return filepath.Join(ts.tokenDir(), safe+"_client_secret.txt")
+}
+
+func (ts *TokenStore) saveSecretToFile(email, secret string) error {
+	dir := ts.tokenDir()
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("creating token dir: %w", err)
+	}
+	path := ts.secretFilePath(email)
+	if err := os.WriteFile(path, []byte(secret), 0600); err != nil {
+		return fmt.Errorf("writing client secret file: %w", err)
+	}
+	return nil
+}
+
+func (ts *TokenStore) loadSecretFromFile(email string) (string, error) {
+	path := ts.secretFilePath(email)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("reading client secret for %s: %w", email, err)
+	}
+	return string(data), nil
+}
+
 // File-based fallback storage
 
 func (ts *TokenStore) tokenDir() string {
 	return filepath.Join(ts.stateDir, "tokens")
 }
 
-func (ts *TokenStore) tokenFilePath(email string) string {
-	// Use a safe filename derived from email
+func sanitizeEmail(email string) string {
 	safe := ""
 	for _, c := range email {
 		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_' {
@@ -106,7 +168,11 @@ func (ts *TokenStore) tokenFilePath(email string) string {
 			safe += "_"
 		}
 	}
-	return filepath.Join(ts.tokenDir(), safe+".json")
+	return safe
+}
+
+func (ts *TokenStore) tokenFilePath(email string) string {
+	return filepath.Join(ts.tokenDir(), sanitizeEmail(email)+".json")
 }
 
 func (ts *TokenStore) saveToFile(email string, data []byte) error {
