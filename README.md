@@ -2,7 +2,7 @@
 
 Multi-account Google Workspace MCP server — connect multiple Gmail, Google Calendar, and Google Drive accounts with smart routing.
 
-Works with **Claude Code**, **GitHub Copilot**, **Cursor**, **Windsurf**, **OpenAI Codex**, and any MCP-compatible client.
+Works with **Claude Code**, **Gemini CLI**, **GitHub Copilot**, **Cursor**, **Windsurf**, **OpenAI Codex**, and any MCP-compatible client.
 
 ## Why
 
