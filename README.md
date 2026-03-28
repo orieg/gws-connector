@@ -143,16 +143,18 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.drive.read_file` | Read file content/metadata |
 | `gws.drive.list_folder` | List folder contents |
 
-### Skills (Claude Code & Gemini CLI)
+### Skills
 
-| Command | Description |
-|---------|-------------|
-| `/gws:configure` | Interactive setup wizard |
-| `/gws:add-account` | Connect a new account |
-| `/gws:remove-account` | Disconnect an account |
-| `/gws:list-accounts` | Show connected accounts |
-| `/gws:set-default` | Change default account |
-| `/gws:reauth` | Re-authorize accounts (refresh tokens/scopes) |
+Interactive workflows available in both Claude Code and Gemini CLI:
+
+| Skill | Description | Claude Code | Gemini CLI |
+|-------|-------------|-------------|------------|
+| configure | Interactive setup wizard | `/gws:configure` | "run the GWS configure skill" |
+| add-account | Connect a new account | `/gws:add-account` | "add a new GWS account" |
+| remove-account | Disconnect an account | `/gws:remove-account` | "remove a GWS account" |
+| list-accounts | Show connected accounts | `/gws:list-accounts` | "list my GWS accounts" |
+| set-default | Change default account | `/gws:set-default` | "set my default GWS account" |
+| reauth | Refresh tokens/scopes | `/gws:reauth` | "reauth my GWS accounts" |
 
 ## Google Cloud Setup
 
