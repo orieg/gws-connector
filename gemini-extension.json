@@ -1,6 +1,6 @@
 {
   "name": "gws-connector",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "mcpServers": {
     "gws-connector": {
       "command": "bash",
