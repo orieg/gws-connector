@@ -118,6 +118,14 @@ func (s *Server) registerTools() {
 	)
 
 	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "accounts", "reauth"),
+			mcp.WithDescription("Re-authorize an existing account to refresh tokens or pick up new OAuth scopes. Does not change account label or settings."),
+			mcp.WithString("account", mcp.Required(), mcp.Description("Account label or email to re-authorize")),
+		),
+		s.handleAccountsReauth,
+	)
+
+	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "set_default"),
 			mcp.WithDescription("Set the default account used when no account is specified"),
 			mcp.WithString("account", mcp.Required(), mcp.Description("Account label or email to set as default")),
@@ -246,6 +254,48 @@ func (s *Server) handleAccountsRemove(ctx context.Context, req mcp.CallToolReque
 	}
 
 	return textResult(fmt.Sprintf("Removed account '%s' (%s). Tokens deleted.", acct.Label, acct.Email)), nil
+}
+
+func (s *Server) handleAccountsReauth(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	account, _ := req.GetArguments()["account"].(string)
+	if account == "" {
+		return errorResult(fmt.Errorf("account is required")), nil
+	}
+
+	acct, err := s.accountRouter.Resolve(account)
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	// Look up existing credentials for this account
+	clientID, clientSecret := s.clientFactory.CredentialsForAccount(acct.Email)
+	if clientID == "" || clientSecret == "" {
+		return errorResult(fmt.Errorf(
+			"no credentials found for %s (%s). Use /gws:add-account to reconnect with credentials.",
+			acct.Label, acct.Email)), nil
+	}
+
+	// Re-run OAuth — new token with potentially updated scopes
+	token, info, err := auth.OAuthFlow(ctx, clientID, clientSecret)
+	if err != nil {
+		return errorResult(fmt.Errorf("OAuth re-authorization failed for %s: %w", acct.Label, err)), nil
+	}
+
+	// Verify the same account was authorized
+	if !strings.EqualFold(info.Email, acct.Email) {
+		return errorResult(fmt.Errorf(
+			"authorized email %s does not match account %s (%s). Sign in with the correct Google account.",
+			info.Email, acct.Label, acct.Email)), nil
+	}
+
+	// Overwrite token — registry stays untouched
+	if err := s.tokenStore.Save(acct.Email, token); err != nil {
+		return errorResult(fmt.Errorf("saving token: %w", err)), nil
+	}
+
+	return textResult(fmt.Sprintf(
+		"Re-authorized %s (%s). Token refreshed with current scopes. Account settings unchanged.",
+		acct.Label, acct.Email)), nil
 }
 
 func (s *Server) handleAccountsSetDefault(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
