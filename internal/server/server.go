@@ -349,16 +349,26 @@ func (s *Server) registerMailTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "create_draft"),
-			mcp.WithDescription("Create an email draft"),
+			mcp.WithDescription("Create an email draft. Supports plain text and HTML bodies."),
 			mcp.WithString("to", mcp.Description("Recipient email(s), comma-separated")),
 			mcp.WithString("subject", mcp.Description("Email subject")),
-			mcp.WithString("body", mcp.Required(), mcp.Description("Email body (plain text)")),
+			mcp.WithString("body", mcp.Required(), mcp.Description("Email body (plain text or HTML)")),
+			mcp.WithString("contentType", mcp.Description("Body content type: 'text/plain' or 'text/html' (auto-detected if omitted)")),
 			mcp.WithString("cc", mcp.Description("CC recipients, comma-separated")),
 			mcp.WithString("bcc", mcp.Description("BCC recipients, comma-separated")),
 			mcp.WithString("threadId", mcp.Description("Thread ID for reply drafts")),
 			accountParam,
 		),
 		s.mailSvc.CreateDraft,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "mail", "send_draft"),
+			mcp.WithDescription("Send an existing email draft. Use after create_draft to actually send the email."),
+			mcp.WithString("draftId", mcp.Required(), mcp.Description("The draft ID returned by create_draft")),
+			accountParam,
+		),
+		s.mailSvc.SendDraft,
 	)
 
 	s.mcpServer.AddTool(

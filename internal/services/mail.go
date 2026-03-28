@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"mime"
 	"regexp"
 	"strings"
 
@@ -161,9 +162,20 @@ func (m *MailService) CreateDraft(ctx context.Context, req mcp.CallToolRequest) 
 	cc, _ := req.GetArguments()["cc"].(string)
 	bcc, _ := req.GetArguments()["bcc"].(string)
 	threadId, _ := req.GetArguments()["threadId"].(string)
+	contentType, _ := req.GetArguments()["contentType"].(string)
+
+	if contentType == "" {
+		// Auto-detect: if body looks like HTML, use text/html
+		if strings.Contains(body, "<html") || strings.Contains(body, "<body") || strings.Contains(body, "<p>") {
+			contentType = "text/html"
+		} else {
+			contentType = "text/plain"
+		}
+	}
 
 	// Build RFC 2822 message
 	var raw strings.Builder
+	raw.WriteString("MIME-Version: 1.0\r\n")
 	if to != "" {
 		raw.WriteString(fmt.Sprintf("To: %s\r\n", to))
 	}
@@ -174,11 +186,12 @@ func (m *MailService) CreateDraft(ctx context.Context, req mcp.CallToolRequest) 
 		raw.WriteString(fmt.Sprintf("Bcc: %s\r\n", bcc))
 	}
 	if subject != "" {
-		raw.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+		raw.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject)))
 	}
-	raw.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	raw.WriteString(fmt.Sprintf("Content-Type: %s; charset=UTF-8\r\n", contentType))
+	raw.WriteString("Content-Transfer-Encoding: base64\r\n")
 	raw.WriteString("\r\n")
-	raw.WriteString(body)
+	raw.WriteString(base64.StdEncoding.EncodeToString([]byte(body)))
 
 	encoded := base64.URLEncoding.EncodeToString([]byte(raw.String()))
 
@@ -197,6 +210,29 @@ func (m *MailService) CreateDraft(ctx context.Context, req mcp.CallToolRequest) 
 	return TextResult(fmt.Sprintf(
 		"Draft created on %s (%s).\nDraft ID: %s\nTo: %s\nSubject: %s",
 		acct.Label, acct.Email, created.Id, to, subject,
+	)), nil
+}
+
+// SendDraft sends an existing draft by its ID.
+func (m *MailService) SendDraft(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	svc, acct, err := m.resolveAndGetService(ctx, req.GetArguments())
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	draftId, _ := req.GetArguments()["draftId"].(string)
+	if draftId == "" {
+		return ErrorResult(fmt.Errorf("draftId is required")), nil
+	}
+
+	msg, err := svc.Users.Drafts.Send("me", &gmail.Draft{Id: draftId}).Do()
+	if err != nil {
+		return ErrorResult(fmt.Errorf("sending draft on %s: %w", acct.Label, err)), nil
+	}
+
+	return TextResult(fmt.Sprintf(
+		"Email sent from %s (%s).\nMessage ID: %s\nThread ID: %s",
+		acct.Label, acct.Email, msg.Id, msg.ThreadId,
 	)), nil
 }
 

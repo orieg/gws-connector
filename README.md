@@ -117,6 +117,7 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.mail.read_message` | Read a specific message |
 | `gws.mail.read_thread` | Read an entire thread |
 | `gws.mail.create_draft` | Create an email draft |
+| `gws.mail.send_draft` | Send an existing draft |
 | `gws.mail.list_labels` | List Gmail labels |
 | `gws.mail.get_profile` | Get account profile info |
 | `gws.cal.list_events` | List calendar events |
