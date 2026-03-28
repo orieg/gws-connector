@@ -62,25 +62,23 @@ make build
 
 Installing as a plugin gives you the MCP server **plus** skills, hooks, and agents.
 
-**Option A — Local install (dev/testing):**
+**Option A — Install from GitHub:**
+
+```
+/plugin marketplace add orieg/gws-connector
+/plugin install gws@gws-connector
+```
+
+**Option B — Local install (dev/testing):**
 
 ```bash
-# Clone and build
 git clone https://github.com/orieg/gws-connector
 cd gws-connector
 make build
-
-# Launch Claude Code with the plugin loaded
 claude --plugin-dir ./
 ```
 
 Use `/reload-plugins` inside the session after making changes. Run `claude --debug --plugin-dir ./` to troubleshoot plugin loading.
-
-**Option B — Marketplace:**
-
-```
-/plugin install gws-connector
-```
 
 Once loaded, run `/gws:configure` for an interactive setup wizard that walks through GCP project creation, OAuth credentials, and connecting accounts.
 
