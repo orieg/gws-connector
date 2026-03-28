@@ -3,7 +3,8 @@
   "version": "0.2.2",
   "mcpServers": {
     "gws-connector": {
-      "command": "${extensionPath}${/}bin${/}gws-mcp"
+      "command": "bash",
+      "args": ["${extensionPath}${/}scripts${/}run-mcp.sh", "--use-dot-names"]
     }
   },
   "contextFileName": "CONTEXT.md"

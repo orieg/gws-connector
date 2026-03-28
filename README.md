@@ -47,10 +47,13 @@ Each account can use different OAuth credentials from different GCP projects.
 
 ```bash
 gemini extensions install https://github.com/orieg/gws-connector
-bash ~/.gemini/extensions/gws-connector/scripts/gemini-setup.sh
 ```
 
-Then connect accounts inside Gemini: `gws.accounts.add(label: "personal", clientId: "...", clientSecret: "...")`
+The binary is downloaded automatically on first use. Then connect accounts inside Gemini:
+
+```
+gws.accounts.add(label: "personal", clientId: "your-client-id", clientSecret: "your-secret")
+```
 
 ### Other clients
 
