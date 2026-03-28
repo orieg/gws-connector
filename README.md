@@ -18,58 +18,66 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
 
-## Quick Start
+## Quick Start (Claude Code)
 
-### Prerequisites
-
-- A Google Cloud project with OAuth credentials ([setup guide below](#google-cloud-setup))
-
-### Install
-
-**Option A — Download prebuilt binary (no Go required):**
-
-```bash
-# macOS (Apple Silicon)
-curl -Lo gws-mcp https://github.com/orieg/gws-connector/releases/latest/download/gws-mcp-darwin-arm64
-chmod +x gws-mcp
-
-# macOS (Intel)
-curl -Lo gws-mcp https://github.com/orieg/gws-connector/releases/latest/download/gws-mcp-darwin-amd64
-chmod +x gws-mcp
-
-# Linux (x86_64)
-curl -Lo gws-mcp https://github.com/orieg/gws-connector/releases/latest/download/gws-mcp-linux-amd64
-chmod +x gws-mcp
-
-# Linux (ARM64)
-curl -Lo gws-mcp https://github.com/orieg/gws-connector/releases/latest/download/gws-mcp-linux-arm64
-chmod +x gws-mcp
-```
-
-**Option B — Build from source (requires Go 1.25+):**
-
-```bash
-git clone https://github.com/orieg/gws-connector
-cd gws-connector
-make build
-# Binary is at ./bin/gws-mcp
-```
-
-### Install per platform
-
-<details>
-<summary><strong>Claude Code (plugin — recommended)</strong></summary>
-
-Installing as a plugin gives you the MCP server **plus** skills, hooks, and agents.
-
-**Option A — Install from GitHub:**
+**1. Install the plugin** — run these two commands inside Claude Code:
 
 ```
 /plugin marketplace add orieg/gws-connector
 /plugin install gws@gws-connector
 ```
 
-**Option B — Local install (dev/testing):**
+**2. Set up Google Cloud credentials** — the interactive wizard walks you through everything:
+
+```
+/gws:configure
+```
+
+This creates a GCP project, enables APIs, and connects your first account (~5 minutes). See [Google Cloud Setup](#google-cloud-setup) if you prefer manual steps.
+
+**3. Connect additional accounts:**
+
+```
+/gws:add-account
+```
+
+Each account can use different OAuth credentials from different GCP projects.
+
+### Other clients
+
+<details>
+<summary><strong>GitHub Copilot / Cursor / Codex / Any MCP client</strong></summary>
+
+Download a [prebuilt binary](https://github.com/orieg/gws-connector/releases/latest) or build from source:
+
+```bash
+git clone https://github.com/orieg/gws-connector && cd gws-connector && make build
+```
+
+Then configure your client:
+
+| Client | Config |
+|--------|--------|
+| **GitHub Copilot** | Auto-detects from `.vscode/mcp.json`, or add `"command": "/path/to/gws-mcp"` to VS Code MCP settings |
+| **Cursor** | Auto-detects from `.cursor/mcp.json`, or add via Settings → MCP Servers |
+| **Codex CLI** | Auto-detects from `codex.json` |
+| **Claude Code (MCP only)** | `claude mcp add --transport stdio gws-connector --scope user -- /path/to/gws-mcp --use-dot-names` |
+| **Any MCP client** | `gws-mcp [--use-dot-names]` over stdio |
+
+Connect accounts via MCP tool call:
+
+```
+gws.accounts.add(label: "personal", clientId: "your-client-id", clientSecret: "your-secret")
+```
+
+Environment variables (all optional): `GWS_GOOGLE_CLIENT_ID`, `GWS_GOOGLE_CLIENT_SECRET`, `GWS_STATE_DIR`
+
+The `--use-dot-names` flag uses `gws.mail.search` naming; without it, tools use `gws_mail_search`.
+
+</details>
+
+<details>
+<summary><strong>Local development / testing</strong></summary>
 
 ```bash
 git clone https://github.com/orieg/gws-connector
@@ -80,112 +88,7 @@ claude --plugin-dir ./
 
 Use `/reload-plugins` inside the session after making changes. Run `claude --debug --plugin-dir ./` to troubleshoot plugin loading.
 
-Once loaded, run `/gws:configure` for an interactive setup wizard that walks through GCP project creation, OAuth credentials, and connecting accounts.
-
 </details>
-
-<details>
-<summary><strong>Claude Code (MCP server only)</strong></summary>
-
-If you only want the MCP tools without skills/hooks/agents, point Claude at the binary directly. Use a [prebuilt binary](#install) or build from source first, then:
-
-```bash
-claude mcp add --transport stdio gws-connector --scope user \
-  -- /path/to/gws-mcp --use-dot-names
-```
-
-Verify with `claude mcp list` or `/mcp` inside a session.
-
-</details>
-
-<details>
-<summary><strong>GitHub Copilot (VS Code)</strong></summary>
-
-The repo includes `.vscode/mcp.json`. After building, Copilot Chat will auto-detect the MCP server.
-
-Or add manually to your VS Code settings:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "gws-connector": {
-        "command": "/path/to/gws-mcp"
-      }
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>Cursor</strong></summary>
-
-The repo includes `.cursor/mcp.json`. After building, Cursor will auto-detect the MCP server.
-
-Or add manually via **Settings → MCP Servers → Add**:
-
-```json
-{
-  "mcpServers": {
-    "gws-connector": {
-      "command": "/path/to/gws-mcp"
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>OpenAI Codex CLI</strong></summary>
-
-Add to your `codex.json` (the repo includes one):
-
-```json
-{
-  "mcpServers": {
-    "gws-connector": {
-      "command": "/path/to/gws-mcp"
-    }
-  }
-}
-```
-
-</details>
-
-<details>
-<summary><strong>Any MCP client</strong></summary>
-
-The `gws-mcp` binary is a standard MCP server speaking JSON-RPC over stdio. Point your client to:
-
-```
-gws-mcp [--use-dot-names]
-```
-
-Environment variables (all optional):
-- `GWS_GOOGLE_CLIENT_ID` — global fallback OAuth client ID
-- `GWS_GOOGLE_CLIENT_SECRET` — global fallback OAuth client secret
-- `GWS_STATE_DIR` — state directory (default: `~/.claude/channels/gws`)
-
-The `--use-dot-names` flag uses `gws.mail.search` naming; without it, tools use `gws_mail_search`.
-
-Credentials are provided per-account when connecting (via `gws.accounts.add`). Global env vars are only used as a fallback.
-
-</details>
-
-### Connect accounts
-
-```
-# Via MCP tool call — credentials are stored securely in OS keychain
-gws.accounts.add(label: "personal", clientId: "your-client-id", clientSecret: "your-secret")
-
-# Or in Claude Code (plugin) — interactive wizard
-/gws:add-account
-```
-
-This opens a browser for Google OAuth. The first account becomes the default. Add more by running the command again with a different label. Each account can use different OAuth credentials from different GCP projects.
 
 ## Usage
 
