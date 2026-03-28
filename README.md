@@ -14,7 +14,7 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Smart routing** — target accounts by label (`work`), email, or domain
 - **Per-account OAuth** — different orgs can use their own GCP credentials
 - **Secure storage** — client secrets and tokens stored in OS keychain (file fallback on Linux without GNOME Keyring)
-- **17 tools** — Mail (search, read, draft, labels), Calendar (list, get, create), Drive (search, read, list)
+- **21 tools** — Mail (search, read, draft, send, labels), Calendar (list, get, create), Drive (search, read, list)
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
 
@@ -125,12 +125,15 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.accounts.add` | Connect a new account |
 | `gws.accounts.remove` | Disconnect an account |
 | `gws.accounts.set_default` | Change the default account |
+| `gws.accounts.reauth` | Re-authorize an account |
 | `gws.mail.search` | Search messages (Gmail query syntax) |
 | `gws.mail.read_message` | Read a specific message |
 | `gws.mail.read_thread` | Read an entire thread |
 | `gws.mail.create_draft` | Create an email draft |
 | `gws.mail.send_draft` | Send an existing draft |
 | `gws.mail.list_labels` | List Gmail labels |
+| `gws.mail.create_label` | Create a new label |
+| `gws.mail.modify_message` | Add/remove labels on a message |
 | `gws.mail.get_profile` | Get account profile info |
 | `gws.cal.list_events` | List calendar events |
 | `gws.cal.get_event` | Get event details |
@@ -140,7 +143,7 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.drive.read_file` | Read file content/metadata |
 | `gws.drive.list_folder` | List folder contents |
 
-### Skills (Claude Code plugin only)
+### Skills (Claude Code & Gemini CLI)
 
 | Command | Description |
 |---------|-------------|
@@ -149,6 +152,7 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `/gws:remove-account` | Disconnect an account |
 | `/gws:list-accounts` | Show connected accounts |
 | `/gws:set-default` | Change default account |
+| `/gws:reauth` | Re-authorize accounts (refresh tokens/scopes) |
 
 ## Google Cloud Setup
 
@@ -208,9 +212,11 @@ gws-connector/
 │   ├── server/                  # MCP tool registration & dispatch
 │   └── services/                # Gmail, Calendar, Drive API wrappers
 │
-├── .claude-plugin/plugin.json   # Claude Code plugin manifest
+├── .claude-plugin/              # Claude Code plugin manifest + marketplace
 ├── .mcp.json                    # Claude Code MCP config
-├── skills/                      # Claude Code slash commands
+├── gemini-extension.json        # Gemini CLI extension manifest
+├── CONTEXT.md                   # Shared behavioral context (both agents)
+├── skills/                      # Slash commands (Claude Code + Gemini CLI)
 ├── hooks/                       # Claude Code session hooks
 ├── agents/                      # Claude Code workspace agent
 │
