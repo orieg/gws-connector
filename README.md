@@ -43,6 +43,15 @@ This creates a GCP project, enables APIs, and connects your first account (~5 mi
 
 Each account can use different OAuth credentials from different GCP projects.
 
+### Gemini CLI
+
+```bash
+gemini extensions install https://github.com/orieg/gws-connector
+bash ~/.gemini/extensions/gws-connector/scripts/gemini-setup.sh
+```
+
+Then connect accounts inside Gemini: `gws.accounts.add(label: "personal", clientId: "...", clientSecret: "...")`
+
 ### Other clients
 
 <details>
