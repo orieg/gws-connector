@@ -1,0 +1,10 @@
+{
+  "name": "gws-connector",
+  "version": "0.2.2",
+  "mcpServers": {
+    "gws-connector": {
+      "command": "${extensionPath}${/}bin${/}gws-mcp"
+    }
+  },
+  "contextFileName": "CONTEXT.md"
+}
