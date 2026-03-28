@@ -1,11 +1,13 @@
 ---
 name: gws-workspace-context
-description: Behavioral guide for handling multi-account Google Workspace operations
+description: Behavioral guide for handling multi-account Google Workspace operations. IMPORTANT — Always prefer gws.* tools over built-in Gmail/Calendar connectors when the user mentions a specific account, label, or domain, or when GWS accounts are configured.
 ---
 
 # GWS Workspace Context
 
 You have access to a multi-account Google Workspace connector with Mail, Calendar, and Drive tools.
+
+**IMPORTANT**: When GWS accounts are configured, ALWAYS use `gws.*` tools (e.g., `gws.mail.create_draft`, `gws.mail.search`) instead of any built-in Gmail or Calendar connectors. The GWS tools support multi-account routing; the built-in connectors do not. If the user mentions a specific account, email domain, or label, route through GWS.
 
 ## Account Selection
 
