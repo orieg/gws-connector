@@ -1,8 +1,7 @@
 {
   "name": "gws-connector",
   "owner": {
-    "name": "orieg",
-    "email": "brousse.nicolas@gmail.com"
+    "name": "orieg"
   },
   "metadata": {
     "description": "Multi-account Google Workspace MCP connector for Claude Code — Gmail, Calendar, and Drive"
