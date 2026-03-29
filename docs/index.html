@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GWS Connector - Multi-account Google Workspace for AI Coding Agents</title>
+  <meta name="description" content="Connect multiple Gmail, Calendar, and Drive accounts to Claude Code, Gemini CLI, GitHub Copilot, Cursor, and more.">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="GWS Connector">
+  <meta property="og:description" content="Multi-account Google Workspace MCP server for AI coding agents. Connect Gmail, Calendar, and Drive with smart routing.">
+  <meta property="og:url" content="https://orieg.github.io/gws-connector/">
+  <meta property="og:site_name" content="GWS Connector">
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="GWS Connector">
+  <meta name="twitter:description" content="Multi-account Google Workspace MCP server for AI coding agents. Connect Gmail, Calendar, and Drive with smart routing.">
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1f4ec;</text></svg>">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-subtle: #1f6feb;
+      --green: #3fb950;
+      --purple: #bc8cff;
+      --orange: #d29922;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 80px 0 48px;
+    }
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .hero h1 span { color: var(--accent); }
+    .hero .tagline {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto 12px;
+    }
+    .hero .catchphrase {
+      font-size: 1rem;
+      color: var(--text-muted);
+      font-style: italic;
+      margin-bottom: 32px;
+    }
+    .hero-install {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 24px;
+      display: inline-block;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.9rem;
+      color: var(--green);
+      user-select: all;
+    }
+    .hero-install .comment { color: var(--text-muted); }
+
+    /* Clients */
+    .clients {
+      text-align: center;
+      padding: 32px 0 48px;
+    }
+    .clients p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 16px;
+    }
+    .client-list {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+    .client-badge {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    /* Features */
+    .features {
+      padding: 48px 0;
+    }
+    .features h2 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-bottom: 32px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+    }
+    .feature-card .icon {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+    }
+    .feature-card h3 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Install */
+    .install {
+      padding: 48px 0;
+    }
+    .install h2 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-bottom: 32px;
+    }
+    .install-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0;
+    }
+    .install-tab {
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      font-family: inherit;
+    }
+    .install-tab:hover { color: var(--text); }
+    .install-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .install-panel {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      padding: 24px;
+    }
+    .install-panel.active { display: block; }
+    .install-panel code {
+      display: block;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 0.85rem;
+      color: var(--green);
+      margin: 8px 0;
+    }
+    .install-panel .step {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 16px;
+    }
+    .install-panel .step:first-child { margin-top: 0; }
+    .install-panel .step strong { color: var(--text); }
+
+    /* Tools */
+    .tools {
+      padding: 48px 0;
+    }
+    .tools h2 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-bottom: 32px;
+    }
+    .tool-columns {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .tool-group h3 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .tool-group ul {
+      list-style: none;
+    }
+    .tool-group li {
+      font-size: 0.85rem;
+      padding: 4px 0;
+    }
+    .tool-group li .name {
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: var(--accent);
+      font-size: 0.8rem;
+    }
+    .tool-group li .desc {
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    footer .links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-bottom: 12px;
+    }
+
+    /* GitHub corner */
+    .github-corner:hover .octo-arm {
+      animation: octocat-wave 560ms ease-in-out;
+    }
+    @keyframes octocat-wave {
+      0%, 100% { transform: rotate(0); }
+      20%, 60% { transform: rotate(-25deg); }
+      40%, 80% { transform: rotate(10deg); }
+    }
+    .github-corner svg {
+      fill: var(--accent);
+      color: var(--bg);
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 10;
+    }
+    @media (max-width: 600px) {
+      .github-corner svg { width: 60px; height: 60px; }
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 1.75rem; }
+      .hero .tagline { font-size: 1rem; }
+      .hero-install { font-size: 0.8rem; padding: 12px 16px; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<a href="https://github.com/orieg/gws-connector" class="github-corner" aria-label="View on GitHub">
+  <svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true">
+    <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
+    <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin:130px 106px;" class="octo-arm"></path>
+    <path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path>
+  </svg>
+</a>
+
+<section class="hero">
+  <div class="container">
+    <h1><span>GWS</span> Connector</h1>
+    <p class="tagline"><strong style="color: var(--text);">Multi-account</strong> Google Workspace MCP server for AI coding agents. Connect Gmail, Calendar, and Drive with smart routing.</p>
+    <p class="catchphrase">Your personal inbox, work email, and side project &mdash; all in one session, zero friction.</p>
+    <div class="hero-install">
+      <span class="comment"># Claude Code</span><br>
+      /plugin marketplace add orieg/gws-connector<br>
+      /plugin install gws@gws-connector
+    </div>
+  </div>
+</section>
+
+<section class="clients">
+  <div class="container">
+    <p>Works with</p>
+    <div class="client-list">
+      <span class="client-badge">Claude Code</span>
+      <span class="client-badge">Gemini CLI</span>
+      <span class="client-badge">GitHub Copilot</span>
+      <span class="client-badge">Cursor</span>
+      <span class="client-badge">OpenAI Codex</span>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="container">
+    <h2>Features</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="icon">&#x1f465;</div>
+        <h3>Multi-Account</h3>
+        <p>Connect unlimited Gmail and Workspace accounts. Route by label, email, or domain.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#x1f527;</div>
+        <h3>21 Tools</h3>
+        <p>Mail (search, read, draft, send, labels), Calendar (list, get, create), Drive (search, read, list).</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#x1f512;</div>
+        <h3>Secure Storage</h3>
+        <p>Tokens and secrets in OS keychain (macOS, Windows, Linux). No plaintext credentials.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#x1f310;</div>
+        <h3>Cross-Platform</h3>
+        <p>Standard MCP server over stdio. Works with any MCP-compatible client.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="install">
+  <div class="container">
+    <h2>Quick Install</h2>
+    <div class="install-tabs">
+      <button class="install-tab active" data-panel="claude">Claude Code</button>
+      <button class="install-tab" data-panel="gemini">Gemini CLI</button>
+      <button class="install-tab" data-panel="other">Other Clients</button>
+    </div>
+    <div class="install-panel active" id="panel-claude">
+      <div class="step"><strong>1. Install the plugin:</strong></div>
+      <code>/plugin marketplace add orieg/gws-connector</code>
+      <code>/plugin install gws@gws-connector</code>
+      <div class="step"><strong>2. Run the setup wizard:</strong></div>
+      <code>/gws:configure</code>
+      <div class="step">Creates a GCP project, enables APIs, and connects your first account (~5 min).</div>
+    </div>
+    <div class="install-panel" id="panel-gemini">
+      <div class="step"><strong>1. Install the extension:</strong></div>
+      <code>gemini extensions install https://github.com/orieg/gws-connector</code>
+      <div class="step"><strong>2. Connect an account:</strong></div>
+      <code>gws.accounts.add(label: "personal", clientId: "...", clientSecret: "...")</code>
+      <div class="step">Binary is downloaded automatically on first use.</div>
+    </div>
+    <div class="install-panel" id="panel-other">
+      <div class="step"><strong>1. Download a <a href="https://github.com/orieg/gws-connector/releases/latest">prebuilt binary</a> or build from source:</strong></div>
+      <code>git clone https://github.com/orieg/gws-connector && cd gws-connector && make build</code>
+      <div class="step"><strong>2. Configure your client:</strong></div>
+      <div class="step">GitHub Copilot auto-detects from <code>.vscode/mcp.json</code>. Cursor auto-detects from <code>.cursor/mcp.json</code>. Codex auto-detects from <code>codex.json</code>.</div>
+      <div class="step">Or add manually: <code>gws-mcp [--use-dot-names]</code> as an MCP server over stdio.</div>
+    </div>
+  </div>
+</section>
+
+<section class="tools">
+  <div class="container">
+    <h2>21 Tools</h2>
+    <div class="tool-columns">
+      <div class="tool-group">
+        <h3>Mail (9 tools)</h3>
+        <ul>
+          <li><span class="name">gws.mail.search</span> <span class="desc">- Search messages</span></li>
+          <li><span class="name">gws.mail.read_message</span> <span class="desc">- Read a message</span></li>
+          <li><span class="name">gws.mail.read_thread</span> <span class="desc">- Read a thread</span></li>
+          <li><span class="name">gws.mail.create_draft</span> <span class="desc">- Create a draft</span></li>
+          <li><span class="name">gws.mail.send_draft</span> <span class="desc">- Send a draft</span></li>
+          <li><span class="name">gws.mail.list_labels</span> <span class="desc">- List labels</span></li>
+          <li><span class="name">gws.mail.create_label</span> <span class="desc">- Create a label</span></li>
+          <li><span class="name">gws.mail.modify_message</span> <span class="desc">- Modify labels</span></li>
+          <li><span class="name">gws.mail.get_profile</span> <span class="desc">- Profile info</span></li>
+        </ul>
+      </div>
+      <div class="tool-group">
+        <h3>Calendar (4 tools)</h3>
+        <ul>
+          <li><span class="name">gws.cal.list_events</span> <span class="desc">- List events</span></li>
+          <li><span class="name">gws.cal.get_event</span> <span class="desc">- Event details</span></li>
+          <li><span class="name">gws.cal.create_event</span> <span class="desc">- Create event</span></li>
+          <li><span class="name">gws.cal.list_calendars</span> <span class="desc">- List calendars</span></li>
+        </ul>
+        <h3 style="margin-top: 24px;">Drive (3 tools)</h3>
+        <ul>
+          <li><span class="name">gws.drive.search</span> <span class="desc">- Search files</span></li>
+          <li><span class="name">gws.drive.read_file</span> <span class="desc">- Read content</span></li>
+          <li><span class="name">gws.drive.list_folder</span> <span class="desc">- List folder</span></li>
+        </ul>
+        <h3 style="margin-top: 24px;">Accounts (5 tools)</h3>
+        <ul>
+          <li><span class="name">gws.accounts.list</span> <span class="desc">- List accounts</span></li>
+          <li><span class="name">gws.accounts.add</span> <span class="desc">- Connect account</span></li>
+          <li><span class="name">gws.accounts.remove</span> <span class="desc">- Disconnect</span></li>
+          <li><span class="name">gws.accounts.set_default</span> <span class="desc">- Set default</span></li>
+          <li><span class="name">gws.accounts.reauth</span> <span class="desc">- Re-authorize</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="links">
+      <a href="https://github.com/orieg/gws-connector">GitHub</a>
+      <a href="https://github.com/orieg/gws-connector/issues">Issues</a>
+      <a href="https://github.com/orieg/gws-connector/releases/latest">Releases</a>
+      <a href="https://github.com/orieg/gws-connector/blob/main/LICENSE">MIT License</a>
+    </div>
+    <p>Built by <a href="https://nicolas.brousse.info/">Nicolas Brousse</a></p>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('.install-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.install-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.install-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
