@@ -1,5 +1,10 @@
 # GWS Connector
 
+[![CI](https://github.com/orieg/gws-connector/actions/workflows/ci.yml/badge.svg)](https://github.com/orieg/gws-connector/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/orieg/gws-connector)](https://github.com/orieg/gws-connector/releases/latest)
+[![Go](https://img.shields.io/github/go-mod/go-version/orieg/gws-connector)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Multi-account Google Workspace MCP server — connect multiple Gmail, Google Calendar, and Google Drive accounts with smart routing.
 
 Works with **Claude Code**, **Gemini CLI**, **GitHub Copilot**, **Cursor**, **OpenAI Codex**, and any MCP-compatible client.
