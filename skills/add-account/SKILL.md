@@ -18,17 +18,12 @@ The user provides a label (e.g., "work", "personal", "client-acme") that will be
    - **Point to a downloaded JSON file**: Read the `client_secret_*.json` file to extract `client_id` and `client_secret` from the `installed` object
    - **Provide Client ID and Client Secret directly** as text
    - If the user has already connected accounts, ask if this new account uses the same GCP project or a different one. If the same, offer to reuse the existing client ID (the secret is in the keychain; they may need to provide it again or point to the same JSON file).
-3. Call `gws.accounts.add` with the label, `clientId`, and `clientSecret` params. This returns immediately with a `pendingId` and opens the user's browser.
-4. Tell the user to complete Google OAuth consent in the browser.
-5. Poll `gws.accounts.complete` with the `pendingId`:
-   - `Status: pending` → call it again (a few seconds later).
-   - Success message → report the connected email and total account count.
-   - Error → report and stop. Do not retry `gws.accounts.add` with the same pending session still in flight.
-6. The client secret is stored securely in the OS keychain.
-
-## Why start/complete are separate
-
-`gws.accounts.add` no longer blocks on the browser callback. It kicks off OAuth and returns a `pendingId` the caller polls with `gws.accounts.complete`. This keeps each MCP tool call short so the stdio transport does not time out.
+3. Call `gws.accounts.add` with the label, `clientId`, and `clientSecret` params. The tool opens the browser and waits up to ~60 seconds for the user to complete consent.
+4. The response is one of:
+   - **Success** → report the connected email and total account count.
+   - **Error** → report and stop.
+   - **Status: pending** (user was slow) → call `gws.accounts.complete` with the returned `pendingId`. Repeat until success or error.
+5. The client secret is stored securely in the OS keychain.
 
 ## Per-account credentials
 

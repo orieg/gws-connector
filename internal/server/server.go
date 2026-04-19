@@ -10,6 +10,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"golang.org/x/oauth2"
 
 	"github.com/orieg/gws-connector/internal/accounts"
 	"github.com/orieg/gws-connector/internal/auth"
@@ -18,6 +19,12 @@ import (
 
 // pendingSessionTTL bounds how long an abandoned OAuth session sits in memory.
 const pendingSessionTTL = 15 * time.Minute
+
+// inlineOAuthWait is how long add/reauth wait inline for the user to finish
+// signing in before returning a pendingId for later polling. Chosen to be
+// comfortably shorter than typical MCP client tool-call timeouts so the
+// stdio transport is never held past the client's patience.
+const inlineOAuthWait = 60 * time.Second
 
 // pendingSession tracks an in-progress OAuth flow started by
 // gws.accounts.add or gws.accounts.reauth and finalized by
@@ -126,9 +133,9 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "add"),
-			mcp.WithDescription("Start connecting a new Google account via OAuth. Opens the browser and "+
-				"returns a pendingId immediately — the tool does NOT block on user interaction. "+
-				"After the user signs in, call gws.accounts.complete with the returned pendingId to finalize. "+
+			mcp.WithDescription("Connect a new Google account via OAuth. Opens the browser and waits up to "+
+				"~60s for sign-in. If the user finishes in time, returns success directly. Otherwise returns "+
+				"a pendingId — call gws.accounts.complete with it to finalize. "+
 				"Each account stores its own credentials. For accounts in different organizations, "+
 				"provide that org's clientId/clientSecret from their GCP project."),
 			mcp.WithString("label", mcp.Required(), mcp.Description("A short label for this account (e.g., 'work', 'personal', 'client-acme')")),
@@ -159,10 +166,10 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "reauth"),
-			mcp.WithDescription("Start re-authorization for an existing account. Opens the browser and returns "+
-				"a pendingId immediately — the tool does NOT block on user interaction. After the user signs in, "+
-				"call gws.accounts.complete with the returned pendingId to finalize. Does not change account "+
-				"label or settings."),
+			mcp.WithDescription("Re-authorize an existing account. Opens the browser and waits up to ~60s "+
+				"for sign-in. If the user finishes in time, returns success directly. Otherwise returns a "+
+				"pendingId — call gws.accounts.complete with it to finalize. Does not change account label "+
+				"or settings."),
 			mcp.WithString("account", mcp.Required(), mcp.Description("Account label or email to re-authorize")),
 		),
 		s.handleAccountsReauth,
@@ -252,9 +259,7 @@ func (s *Server) handleAccountsAdd(ctx context.Context, req mcp.CallToolRequest)
 		return errorResult(fmt.Errorf("starting OAuth flow: %w", err)), nil
 	}
 
-	s.gcPending()
-	s.pendingMu.Lock()
-	s.pending[flow.ID] = &pendingSession{
+	sess := &pendingSession{
 		flow:         flow,
 		kind:         "add",
 		createdAt:    time.Now(),
@@ -262,15 +267,14 @@ func (s *Server) handleAccountsAdd(ctx context.Context, req mcp.CallToolRequest)
 		perAcctID:    reqClientID,
 		clientSecret: clientSecret,
 	}
+	s.gcPending()
+	s.pendingMu.Lock()
+	s.pending[flow.ID] = sess
 	s.pendingMu.Unlock()
 
-	return textResult(fmt.Sprintf(
-		"OAuth started. A browser window should have opened for Google sign-in.\n\n"+
-			"pendingId: %s\n\n"+
-			"If the browser did not open, visit:\n%s\n\n"+
-			"After approving in the browser, call gws.accounts.complete with pendingId='%s' "+
-			"to finalize the connection.",
-		flow.ID, flow.AuthURL, flow.ID)), nil
+	return s.waitOrReportPending(ctx, sess, inlineOAuthWait,
+		fmt.Sprintf("A browser window should have opened for Google sign-in.\n\n"+
+			"If the browser did not open, visit:\n%s\n", flow.AuthURL)), nil
 }
 
 func (s *Server) handleAccountsRemove(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -325,24 +329,23 @@ func (s *Server) handleAccountsReauth(ctx context.Context, req mcp.CallToolReque
 		return errorResult(fmt.Errorf("starting OAuth flow: %w", err)), nil
 	}
 
-	s.gcPending()
-	s.pendingMu.Lock()
-	s.pending[flow.ID] = &pendingSession{
+	sess := &pendingSession{
 		flow:        flow,
 		kind:        "reauth",
 		createdAt:   time.Now(),
 		targetEmail: acct.Email,
 		targetLabel: acct.Label,
 	}
+	s.gcPending()
+	s.pendingMu.Lock()
+	s.pending[flow.ID] = sess
 	s.pendingMu.Unlock()
 
-	return textResult(fmt.Sprintf(
-		"OAuth started for %s (%s). A browser window should have opened for Google sign-in.\n\n"+
-			"pendingId: %s\n\n"+
-			"If the browser did not open, visit:\n%s\n\n"+
-			"Sign in with the same Google account (%s). Then call gws.accounts.complete with "+
-			"pendingId='%s' to finalize.",
-		acct.Label, acct.Email, flow.ID, flow.AuthURL, acct.Email, flow.ID)), nil
+	return s.waitOrReportPending(ctx, sess, inlineOAuthWait,
+		fmt.Sprintf("Re-authorizing %s (%s). A browser window should have opened — sign in with "+
+			"the same Google account.\n\n"+
+			"If the browser did not open, visit:\n%s\n",
+			acct.Label, acct.Email, flow.AuthURL)), nil
 }
 
 func (s *Server) handleAccountsComplete(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -366,42 +369,62 @@ func (s *Server) handleAccountsComplete(ctx context.Context, req mcp.CallToolReq
 		return errorResult(fmt.Errorf("unknown pendingId %q — the session may have expired, been completed, or never existed", id)), nil
 	}
 
-	done, token, info, err := sess.flow.Wait(ctx, time.Duration(waitSeconds*float64(time.Second)))
+	return s.waitOrReportPending(ctx, sess, time.Duration(waitSeconds*float64(time.Second)), ""), nil
+}
+
+// waitOrReportPending waits up to timeout on the session's flow and either
+// commits the result or returns a status message instructing the caller to
+// poll gws.accounts.complete later. preamble, if non-empty, is prepended to
+// the pending message (used by add/reauth on the initial inline wait).
+func (s *Server) waitOrReportPending(ctx context.Context, sess *pendingSession, timeout time.Duration, preamble string) *mcp.CallToolResult {
+	done, token, info, err := sess.flow.Wait(ctx, timeout)
 	if !done {
 		if err != nil {
-			return errorResult(fmt.Errorf("wait aborted: %w", err)), nil
+			// ctx cancelled — keep the session alive so the caller can retry.
+			return errorResult(fmt.Errorf("wait aborted: %w", err))
 		}
-		return textResult(fmt.Sprintf(
-			"Status: pending. Sign-in not yet complete. Call gws.accounts.complete again with pendingId='%s'.",
-			id)), nil
+		msg := ""
+		if preamble != "" {
+			msg = preamble + "\n"
+		}
+		msg += fmt.Sprintf("Status: pending — sign-in not yet complete.\n"+
+			"pendingId: %s\n\n"+
+			"Call gws.accounts.complete with pendingId='%s' to finish. Repeat until it "+
+			"reports success or an error.",
+			sess.flow.ID, sess.flow.ID)
+		return textResult(msg)
 	}
 
-	// Flow finished — remove the session atomically so parallel complete calls
-	// don't double-commit.
+	// Flow finished — remove the session atomically so parallel callers don't
+	// double-commit.
 	s.pendingMu.Lock()
-	_, still := s.pending[id]
-	delete(s.pending, id)
+	_, still := s.pending[sess.flow.ID]
+	delete(s.pending, sess.flow.ID)
 	s.pendingMu.Unlock()
 	sess.flow.Close()
 
 	if !still {
-		return textResult("Already completed."), nil
+		return textResult("Already completed.")
 	}
 
 	if err != nil {
-		return errorResult(fmt.Errorf("OAuth authorization failed: %w", err)), nil
+		return errorResult(fmt.Errorf("OAuth authorization failed: %w", err))
 	}
 
+	return s.commitPendingSession(sess, token, info)
+}
+
+func (s *Server) commitPendingSession(sess *pendingSession, token *oauth2.Token, info *auth.UserInfo) *mcp.CallToolResult {
 	switch sess.kind {
 	case "add":
 		if err := s.tokenStore.Save(info.Email, token); err != nil {
-			return errorResult(fmt.Errorf("saving token: %w", err)), nil
+			return errorResult(fmt.Errorf("saving token: %w", err))
 		}
 		if err := s.tokenStore.SaveClientSecret(info.Email, sess.clientSecret); err != nil {
-			return errorResult(fmt.Errorf("saving client secret: %w", err)), nil
+			return errorResult(fmt.Errorf("saving client secret: %w", err))
 		}
 		if err := s.accountStore.Add(info.Email, sess.label, info.DisplayName, sess.perAcctID); err != nil {
-			return errorResult(fmt.Errorf("registering account: %w", err)), nil
+			return errorResult(fmt.Errorf("registering account: %w", err))
 		}
 		accts, _ := s.accountRouter.ListAccounts()
 		credNote := "using global credentials"
@@ -410,23 +433,23 @@ func (s *Server) handleAccountsComplete(ctx context.Context, req mcp.CallToolReq
 		}
 		return textResult(fmt.Sprintf(
 			"Successfully connected %s (%s) as '%s' (%s). You now have %d account(s) connected.",
-			info.DisplayName, info.Email, sess.label, credNote, len(accts))), nil
+			info.DisplayName, info.Email, sess.label, credNote, len(accts)))
 
 	case "reauth":
 		if !strings.EqualFold(info.Email, sess.targetEmail) {
 			return errorResult(fmt.Errorf(
 				"authorized email %s does not match account %s (%s). Sign in with the correct Google account.",
-				info.Email, sess.targetLabel, sess.targetEmail)), nil
+				info.Email, sess.targetLabel, sess.targetEmail))
 		}
 		if err := s.tokenStore.Save(sess.targetEmail, token); err != nil {
-			return errorResult(fmt.Errorf("saving token: %w", err)), nil
+			return errorResult(fmt.Errorf("saving token: %w", err))
 		}
 		return textResult(fmt.Sprintf(
 			"Re-authorized %s (%s). Token refreshed with current scopes. Account settings unchanged.",
-			sess.targetLabel, sess.targetEmail)), nil
+			sess.targetLabel, sess.targetEmail))
 
 	default:
-		return errorResult(fmt.Errorf("internal: unknown pending session kind %q", sess.kind)), nil
+		return errorResult(fmt.Errorf("internal: unknown pending session kind %q", sess.kind))
 	}
 }
 
