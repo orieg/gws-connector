@@ -227,6 +227,8 @@ func TestAllToolsRegistered(t *testing.T) {
 		// Account management
 		"gws.accounts.list",
 		"gws.accounts.add",
+		"gws.accounts.reauth",
+		"gws.accounts.complete",
 		"gws.accounts.remove",
 		"gws.accounts.set_default",
 		// Mail
@@ -277,6 +279,34 @@ func TestToolHasAccountParam(t *testing.T) {
 		} else {
 			t.Errorf("tool %q not found", toolName)
 		}
+	}
+}
+
+func TestHandleAccountsCompleteMissingPendingId(t *testing.T) {
+	s := testServer(t)
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{}
+
+	result, _ := s.handleAccountsComplete(context.Background(), req)
+	if !result.IsError {
+		t.Error("expected error when pendingId missing")
+	}
+	if !strings.Contains(extractText(result), "pendingId is required") {
+		t.Errorf("unexpected: %s", extractText(result))
+	}
+}
+
+func TestHandleAccountsCompleteUnknownPendingId(t *testing.T) {
+	s := testServer(t)
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"pendingId": "does-not-exist"}
+
+	result, _ := s.handleAccountsComplete(context.Background(), req)
+	if !result.IsError {
+		t.Error("expected error for unknown pendingId")
+	}
+	if !strings.Contains(extractText(result), "unknown pendingId") {
+		t.Errorf("unexpected: %s", extractText(result))
 	}
 }
 

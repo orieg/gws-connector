@@ -8,9 +8,11 @@ import (
 	"html"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -34,16 +36,51 @@ type UserInfo struct {
 	DisplayName string
 }
 
-// OAuthFlow runs an interactive OAuth2 authorization for a new account.
-// It starts a local HTTP server, opens the browser, and waits for the callback.
-func OAuthFlow(ctx context.Context, clientID, clientSecret string) (*oauth2.Token, *UserInfo, error) {
-	// Bind a free port — keep the listener open to prevent TOCTOU races.
+// openBrowserFn is overridable for tests.
+var openBrowserFn = openBrowser
+
+// flowTimeout is how long the background goroutine waits for the user to
+// complete the browser consent before failing the flow.
+const flowTimeout = 10 * time.Minute
+
+// PendingFlow is a non-blocking OAuth authorization in progress.
+//
+// The caller starts the flow with StartOAuthFlow (which binds a local
+// callback server, opens the browser, and returns immediately), then polls
+// Wait with a short timeout until the flow completes. This avoids holding
+// an MCP tool call open while the user interacts with their browser.
+type PendingFlow struct {
+	ID      string
+	AuthURL string
+
+	conf     *oauth2.Config
+	listener net.Listener
+	server   *http.Server
+	state    string
+
+	codeCh chan string
+	errCh  chan error
+
+	closeOnce sync.Once
+	closed    chan struct{}
+
+	mu     sync.Mutex
+	done   bool
+	doneCh chan struct{}
+	token  *oauth2.Token
+	info   *UserInfo
+	err    error
+}
+
+// StartOAuthFlow binds a local callback server, opens the browser, and
+// returns a PendingFlow the caller can poll via Wait. It does NOT block
+// on the user's browser interaction.
+func StartOAuthFlow(clientID, clientSecret string) (*PendingFlow, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, nil, fmt.Errorf("finding free port: %w", err)
+		return nil, fmt.Errorf("finding free port: %w", err)
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
-
 	redirectURL := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
 
 	conf := &oauth2.Config{
@@ -54,98 +91,170 @@ func OAuthFlow(ctx context.Context, clientID, clientSecret string) (*oauth2.Toke
 		RedirectURL:  redirectURL,
 	}
 
-	// Generate state for CSRF protection
 	stateBytes := make([]byte, 16)
 	if _, err := rand.Read(stateBytes); err != nil {
 		listener.Close()
-		return nil, nil, fmt.Errorf("generating state: %w", err)
+		return nil, fmt.Errorf("generating state: %w", err)
 	}
 	state := hex.EncodeToString(stateBytes)
 
-	// Channel to receive the auth code
-	codeCh := make(chan string, 1)
-	errCh := make(chan error, 1)
+	idBytes := make([]byte, 8)
+	if _, err := rand.Read(idBytes); err != nil {
+		listener.Close()
+		return nil, fmt.Errorf("generating id: %w", err)
+	}
+
+	p := &PendingFlow{
+		ID:       hex.EncodeToString(idBytes),
+		AuthURL:  conf.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("prompt", "consent")),
+		conf:     conf,
+		listener: listener,
+		state:    state,
+		codeCh:   make(chan string, 1),
+		errCh:    make(chan error, 1),
+		closed:   make(chan struct{}),
+		doneCh:   make(chan struct{}),
+	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("state") != state {
-			errCh <- fmt.Errorf("invalid state parameter — possible CSRF attack")
-			http.Error(w, "Invalid state", http.StatusBadRequest)
-			return
-		}
-		if errMsg := r.URL.Query().Get("error"); errMsg != "" {
-			errCh <- fmt.Errorf("OAuth error: %s — %s", errMsg, r.URL.Query().Get("error_description"))
-			w.Header().Set("Content-Type", "text/html")
-			fmt.Fprint(w, oauthPageHTML("Authorization Failed",
-				fmt.Sprintf("Error: %s", errMsg),
-				true))
-			return
-		}
-		code := r.URL.Query().Get("code")
-		if code == "" {
-			errCh <- fmt.Errorf("no authorization code received")
-			http.Error(w, "No code", http.StatusBadRequest)
-			return
-		}
-		codeCh <- code
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, oauthPageHTML("Authorization Successful",
-			"Your Google account has been connected. You can close this window and return to your editor.",
-			false))
-	})
-
-	server := &http.Server{
+	mux.HandleFunc("/callback", p.handleCallback)
+	p.server = &http.Server{
 		Handler:      mux,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
-	// Serve on the already-bound listener (no TOCTOU gap)
 	go func() {
-		if err := server.Serve(listener); err != http.ErrServerClosed {
-			errCh <- fmt.Errorf("callback server: %w", err)
+		if err := p.server.Serve(listener); err != http.ErrServerClosed {
+			select {
+			case p.errCh <- fmt.Errorf("callback server: %w", err):
+			default:
+			}
 		}
 	}()
-	defer func() {
+
+	if err := openBrowserFn(p.AuthURL); err != nil {
+		// Non-fatal — the caller gets AuthURL to share with the user.
+		fmt.Fprintf(os.Stderr, "gws-connector: could not open browser automatically: %v\n", err)
+	}
+
+	go p.watch()
+
+	return p, nil
+}
+
+func (p *PendingFlow) handleCallback(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("state") != p.state {
+		select {
+		case p.errCh <- fmt.Errorf("invalid state parameter — possible CSRF attack"):
+		default:
+		}
+		http.Error(w, "Invalid state", http.StatusBadRequest)
+		return
+	}
+	if errMsg := r.URL.Query().Get("error"); errMsg != "" {
+		select {
+		case p.errCh <- fmt.Errorf("OAuth error: %s — %s", errMsg, r.URL.Query().Get("error_description")):
+		default:
+		}
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, oauthPageHTML("Authorization Failed", fmt.Sprintf("Error: %s", errMsg), true))
+		return
+	}
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		select {
+		case p.errCh <- fmt.Errorf("no authorization code received"):
+		default:
+		}
+		http.Error(w, "No code", http.StatusBadRequest)
+		return
+	}
+	select {
+	case p.codeCh <- code:
+	default:
+	}
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprint(w, oauthPageHTML("Authorization Successful",
+		"Your Google account has been connected. You can close this window and return to your editor.", false))
+}
+
+// watch runs in its own goroutine until a code, error, timeout, or Close.
+func (p *PendingFlow) watch() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case <-p.closed:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	select {
+	case code := <-p.codeCh:
+		tok, err := p.conf.Exchange(ctx, code)
+		if err != nil {
+			p.finalize(nil, nil, fmt.Errorf("exchanging code for token: %w", err))
+			return
+		}
+		info, err := fetchUserInfo(ctx, p.conf, tok)
+		if err != nil {
+			p.finalize(nil, nil, fmt.Errorf("fetching user info: %w", err))
+			return
+		}
+		p.finalize(tok, info, nil)
+	case err := <-p.errCh:
+		p.finalize(nil, nil, err)
+	case <-time.After(flowTimeout):
+		p.finalize(nil, nil, fmt.Errorf("authorization timed out after %s", flowTimeout))
+	case <-p.closed:
+		p.finalize(nil, nil, fmt.Errorf("authorization cancelled"))
+	}
+}
+
+func (p *PendingFlow) finalize(tok *oauth2.Token, info *UserInfo, err error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.done {
+		return
+	}
+	p.done = true
+	p.token = tok
+	p.info = info
+	p.err = err
+	close(p.doneCh)
+}
+
+// Wait blocks for at most timeout waiting for the flow to finish.
+//
+// If the flow completed (successfully or with an error), returns done=true
+// with the token/info/err. If the timeout expired first, returns done=false
+// with no error — the caller should call Wait again later.
+func (p *PendingFlow) Wait(ctx context.Context, timeout time.Duration) (done bool, token *oauth2.Token, info *UserInfo, err error) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-p.doneCh:
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return true, p.token, p.info, p.err
+	case <-timer.C:
+		return false, nil, nil, nil
+	case <-ctx.Done():
+		return false, nil, nil, ctx.Err()
+	}
+}
+
+// Close shuts down the callback server and cancels the flow. Safe to call
+// multiple times.
+func (p *PendingFlow) Close() {
+	p.closeOnce.Do(func() {
+		close(p.closed)
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		server.Shutdown(shutdownCtx)
-	}()
-
-	// Open browser
-	authURL := conf.AuthCodeURL(state,
-		oauth2.AccessTypeOffline,
-		oauth2.SetAuthURLParam("prompt", "consent"),
-	)
-	if err := openBrowser(authURL); err != nil {
-		return nil, nil, fmt.Errorf("opening browser: %w — please open this URL manually:\n%s", err, authURL)
-	}
-
-	// Wait for callback (with timeout)
-	select {
-	case code := <-codeCh:
-		token, err := conf.Exchange(ctx, code)
-		if err != nil {
-			return nil, nil, fmt.Errorf("exchanging code for token: %w", err)
-		}
-
-		// Fetch user info
-		info, err := fetchUserInfo(ctx, conf, token)
-		if err != nil {
-			return nil, nil, fmt.Errorf("fetching user info: %w", err)
-		}
-
-		return token, info, nil
-
-	case err := <-errCh:
-		return nil, nil, err
-
-	case <-time.After(5 * time.Minute):
-		return nil, nil, fmt.Errorf("authorization timed out after 5 minutes")
-
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
-	}
+		_ = p.server.Shutdown(shutdownCtx)
+	})
 }
 
 func fetchUserInfo(ctx context.Context, conf *oauth2.Config, token *oauth2.Token) (*UserInfo, error) {
