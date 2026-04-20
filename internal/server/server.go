@@ -454,15 +454,24 @@ func (s *Server) commitPendingSession(sess *pendingSession, token *oauth2.Token,
 }
 
 // gcPending removes abandoned pending sessions older than pendingSessionTTL.
+//
+// Close() does a graceful HTTP server shutdown (up to 5s per session), so the
+// actual closing happens outside the mutex — holding the lock across it would
+// stall every other account tool call.
 func (s *Server) gcPending() {
 	cutoff := time.Now().Add(-pendingSessionTTL)
+	var toClose []*pendingSession
 	s.pendingMu.Lock()
-	defer s.pendingMu.Unlock()
 	for id, sess := range s.pending {
 		if sess.createdAt.Before(cutoff) {
-			sess.flow.Close()
+			toClose = append(toClose, sess)
 			delete(s.pending, id)
 		}
+	}
+	s.pendingMu.Unlock()
+
+	for _, sess := range toClose {
+		sess.flow.Close()
 	}
 }
 
