@@ -127,10 +127,11 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | Tool | Description |
 |------|-------------|
 | `gws.accounts.list` | List all connected accounts |
-| `gws.accounts.add` | Connect a new account |
+| `gws.accounts.add` | Connect a new account (waits up to ~60s; returns `pendingId` if slower) |
+| `gws.accounts.reauth` | Re-authorize an account (waits up to ~60s; returns `pendingId` if slower) |
+| `gws.accounts.complete` | Finalize a pending OAuth flow (only needed if add/reauth returned `pendingId`) |
 | `gws.accounts.remove` | Disconnect an account |
 | `gws.accounts.set_default` | Change the default account |
-| `gws.accounts.reauth` | Re-authorize an account |
 | `gws.mail.search` | Search messages (Gmail query syntax) |
 | `gws.mail.read_message` | Read a specific message |
 | `gws.mail.read_thread` | Read an entire thread |
