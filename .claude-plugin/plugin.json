@@ -1,6 +1,6 @@
 {
   "name": "gws",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Multi-account workspace integration — Mail, Calendar, Drive, Sheets, and Docs with smart account routing for Gmail and Google Workspace",
   "author": {
     "name": "orieg",
