@@ -21,10 +21,18 @@ import (
 const pendingSessionTTL = 15 * time.Minute
 
 // inlineOAuthWait is how long add/reauth wait inline for the user to finish
-// signing in before returning a pendingId for later polling. Chosen to be
-// comfortably shorter than typical MCP client tool-call timeouts so the
-// stdio transport is never held past the client's patience.
-const inlineOAuthWait = 60 * time.Second
+// signing in before returning a pendingId for later polling. Kept small —
+// Claude Code's default MCP_TIMEOUT is 30s, so any blocking beyond that
+// causes the client to treat the tool call as timed out (and may mark the
+// server as unresponsive). The browser flow never finishes in ≤2s anyway;
+// the fast-path here is essentially zero-value, so we just return pending
+// quickly and rely on gws.accounts.complete for polling.
+const inlineOAuthWait = 2 * time.Second
+
+// maxCompleteWait caps how long a single gws.accounts.complete call blocks.
+// Also kept well under MCP_TIMEOUT (30s) — callers should poll in short
+// increments instead of holding a single call open.
+const maxCompleteWait = 3 * time.Second
 
 // pendingSession tracks an in-progress OAuth flow started by
 // gws.accounts.add or gws.accounts.reauth and finalized by
@@ -137,9 +145,9 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "add"),
-			mcp.WithDescription("Connect a new Google account via OAuth. Opens the browser and waits up to "+
-				"~60s for sign-in. If the user finishes in time, returns success directly. Otherwise returns "+
-				"a pendingId — call gws.accounts.complete with it to finalize. "+
+			mcp.WithDescription("Connect a new Google account via OAuth. Opens the browser and returns "+
+				"quickly with a pendingId — call gws.accounts.complete (poll it) to finalize once the "+
+				"user finishes the browser consent. "+
 				"Each account stores its own credentials. For accounts in different organizations, "+
 				"provide that org's clientId/clientSecret from their GCP project."),
 			mcp.WithString("label", mcp.Required(), mcp.Description("A short label for this account (e.g., 'work', 'personal', 'client-acme')")),
@@ -155,7 +163,7 @@ func (s *Server) registerTools() {
 				"Returns quickly; if the user has not yet completed sign-in, responds with status 'pending' "+
 				"and the caller should call again."),
 			mcp.WithString("pendingId", mcp.Required(), mcp.Description("The pendingId returned by add/reauth")),
-			mcp.WithNumber("waitSeconds", mcp.Description("Max seconds to wait for completion on this call (default 3, max 30)")),
+			mcp.WithNumber("waitSeconds", mcp.Description("Max seconds to wait for completion on this call (default 3, max 3). Poll in short increments rather than holding a single call open.")),
 		),
 		s.handleAccountsComplete,
 	)
@@ -170,10 +178,9 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "reauth"),
-			mcp.WithDescription("Re-authorize an existing account. Opens the browser and waits up to ~60s "+
-				"for sign-in. If the user finishes in time, returns success directly. Otherwise returns a "+
-				"pendingId — call gws.accounts.complete with it to finalize. Does not change account label "+
-				"or settings."),
+			mcp.WithDescription("Re-authorize an existing account. Opens the browser and returns quickly "+
+				"with a pendingId — call gws.accounts.complete (poll it) to finalize once the user "+
+				"finishes the browser consent. Does not change account label or settings."),
 			mcp.WithString("account", mcp.Required(), mcp.Description("Account label or email to re-authorize")),
 		),
 		s.handleAccountsReauth,
@@ -364,12 +371,12 @@ func (s *Server) handleAccountsComplete(ctx context.Context, req mcp.CallToolReq
 		return errorResult(fmt.Errorf("pendingId is required")), nil
 	}
 
-	waitSeconds := 3.0
+	wait := maxCompleteWait
 	if v, ok := req.GetArguments()["waitSeconds"].(float64); ok && v > 0 {
-		waitSeconds = v
+		wait = time.Duration(v * float64(time.Second))
 	}
-	if waitSeconds > 30 {
-		waitSeconds = 30
+	if wait > maxCompleteWait {
+		wait = maxCompleteWait
 	}
 
 	s.pendingMu.Lock()
@@ -379,7 +386,7 @@ func (s *Server) handleAccountsComplete(ctx context.Context, req mcp.CallToolReq
 		return errorResult(fmt.Errorf("unknown pendingId %q — the session may have expired, been completed, or never existed", id)), nil
 	}
 
-	return s.waitOrReportPending(ctx, sess, time.Duration(waitSeconds*float64(time.Second)), ""), nil
+	return s.waitOrReportPending(ctx, sess, wait, ""), nil
 }
 
 // waitOrReportPending waits up to timeout on the session's flow and either

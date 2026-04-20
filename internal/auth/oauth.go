@@ -52,6 +52,14 @@ type UserInfo struct {
 // openBrowserFn is overridable for tests.
 var openBrowserFn = openBrowser
 
+// SetOpenBrowserForTest overrides the browser-launching function and returns
+// a restore func. Tests only.
+func SetOpenBrowserForTest(fn func(string) error) func() {
+	prev := openBrowserFn
+	openBrowserFn = fn
+	return func() { openBrowserFn = prev }
+}
+
 // flowTimeout is how long the background goroutine waits for the user to
 // complete the browser consent before failing the flow.
 const flowTimeout = 10 * time.Minute
@@ -290,6 +298,9 @@ func fetchUserInfo(ctx context.Context, conf *oauth2.Config, token *oauth2.Token
 }
 
 func openBrowser(url string) error {
+	if os.Getenv("GWS_NO_BROWSER") == "1" {
+		return nil
+	}
 	switch runtime.GOOS {
 	case "darwin":
 		return exec.Command("open", url).Start()
