@@ -49,8 +49,33 @@ type UserInfo struct {
 	DisplayName string
 }
 
-// openBrowserFn is overridable for tests.
-var openBrowserFn = openBrowser
+// openBrowserFn is overridable for tests. Guarded by openBrowserMu so parallel
+// tests (t.Parallel, concurrent packages) that swap it don't race with the
+// production read in StartOAuthFlow.
+var (
+	openBrowserMu sync.RWMutex
+	openBrowserFn = openBrowser
+)
+
+func getOpenBrowserFn() func(string) error {
+	openBrowserMu.RLock()
+	defer openBrowserMu.RUnlock()
+	return openBrowserFn
+}
+
+// SetOpenBrowserForTest overrides the browser-launching function and returns
+// a restore func. Tests only.
+func SetOpenBrowserForTest(fn func(string) error) func() {
+	openBrowserMu.Lock()
+	prev := openBrowserFn
+	openBrowserFn = fn
+	openBrowserMu.Unlock()
+	return func() {
+		openBrowserMu.Lock()
+		openBrowserFn = prev
+		openBrowserMu.Unlock()
+	}
+}
 
 // flowTimeout is how long the background goroutine waits for the user to
 // complete the browser consent before failing the flow.
@@ -146,7 +171,7 @@ func StartOAuthFlow(clientID, clientSecret string) (*PendingFlow, error) {
 		}
 	}()
 
-	if err := openBrowserFn(p.AuthURL); err != nil {
+	if err := getOpenBrowserFn()(p.AuthURL); err != nil {
 		// Non-fatal — the caller gets AuthURL to share with the user.
 		fmt.Fprintf(os.Stderr, "gws-connector: could not open browser automatically: %v\n", err)
 	}
@@ -290,6 +315,9 @@ func fetchUserInfo(ctx context.Context, conf *oauth2.Config, token *oauth2.Token
 }
 
 func openBrowser(url string) error {
+	if os.Getenv("GWS_NO_BROWSER") == "1" {
+		return nil
+	}
 	switch runtime.GOOS {
 	case "darwin":
 		return exec.Command("open", url).Start()
