@@ -14,7 +14,7 @@
         "repo": "orieg/gws-connector"
       },
       "description": "Multi-account workspace integration — Mail, Calendar, and Drive with smart account routing for Gmail and Google Workspace",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "author": {
         "name": "orieg"
       },
