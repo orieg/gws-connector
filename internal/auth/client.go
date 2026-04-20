@@ -8,9 +8,11 @@ import (
 
 	"golang.org/x/oauth2"
 	"google.golang.org/api/calendar/v3"
+	docs "google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/option"
+	sheets "google.golang.org/api/sheets/v4"
 )
 
 // AccountCredentials provides per-account OAuth client ID lookup.
@@ -109,4 +111,49 @@ func (f *ClientFactory) DriveService(ctx context.Context, email string) (*drive.
 		return nil, err
 	}
 	return drive.NewService(ctx, option.WithHTTPClient(client))
+}
+
+// SheetsService returns an authenticated Sheets service for the account.
+//
+// If the account's stored token does not carry the Sheets scope — common for
+// users upgrading from releases that pre-date Sheets support — this returns
+// a *ScopeError immediately, without hitting the Google API. Callers
+// surface the error directly; the message tells the agent which reauth
+// tool to call.
+func (f *ClientFactory) SheetsService(ctx context.Context, email string) (*sheets.Service, error) {
+	if err := f.ensureScope(email, ScopeSheets, "Sheets"); err != nil {
+		return nil, err
+	}
+	client, err := f.httpClient(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return sheets.NewService(ctx, option.WithHTTPClient(client))
+}
+
+// DocsService returns an authenticated Docs service for the account.
+// Same proactive-scope behavior as SheetsService.
+func (f *ClientFactory) DocsService(ctx context.Context, email string) (*docs.Service, error) {
+	if err := f.ensureScope(email, ScopeDocs, "Docs"); err != nil {
+		return nil, err
+	}
+	client, err := f.httpClient(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return docs.NewService(ctx, option.WithHTTPClient(client))
+}
+
+// ensureScope loads the account's token and runs ValidateScopes against it.
+// Used by Sheets/Docs factory methods so a stale token is caught before any
+// API call is attempted. Label is derived from email when we can't look it
+// up through AccountCredentials (the interface only exposes GetClientID).
+func (f *ClientFactory) ensureScope(email, scope, operation string) error {
+	tok, err := f.tokenStore.Load(email)
+	if err != nil {
+		// Missing-token failures are already well-surfaced by httpClient
+		// downstream; let that path handle them so we don't double-wrap.
+		return nil
+	}
+	return ValidateScopes(tok, []string{scope}, email, email, operation)
 }

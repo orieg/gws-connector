@@ -63,6 +63,8 @@ type Server struct {
 	mailSvc       *services.MailService
 	calSvc        *services.CalendarService
 	driveSvc      *services.DriveService
+	sheetsSvc     *services.SheetsService
+	docsSvc       *services.DocsService
 
 	pendingMu sync.Mutex
 	pending   map[string]*pendingSession
@@ -84,6 +86,8 @@ func New(cfg Config) *Server {
 		mailSvc:       services.NewMailService(router, clientFactory),
 		calSvc:        services.NewCalendarService(router, clientFactory),
 		driveSvc:      services.NewDriveService(router, clientFactory),
+		sheetsSvc:     services.NewSheetsService(router, clientFactory),
+		docsSvc:       services.NewDocsService(router, clientFactory),
 		pending:       make(map[string]*pendingSession),
 	}
 
@@ -191,6 +195,12 @@ func (s *Server) registerTools() {
 
 	// Drive tools
 	s.registerDriveTools()
+
+	// Sheets tools
+	s.registerSheetsTools()
+
+	// Docs tools
+	s.registerDocsTools()
 }
 
 // Serve starts the MCP server on stdio.
@@ -666,6 +676,118 @@ func (s *Server) registerDriveTools() {
 			accountParam,
 		),
 		s.driveSvc.ListFolder,
+	)
+}
+
+func (s *Server) registerSheetsTools() {
+	accountParam := mcp.WithString("account", mcp.Description("Account label or email. Uses default if omitted."))
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "sheets", "read_range"),
+			mcp.WithDescription("Read a single range from a Google Spreadsheet. "+
+				"range uses A1 notation (e.g., 'Sheet1!A1:C10', 'A1:B5'). Response "+
+				"includes a human-readable preview plus a structured JSON payload "+
+				"with the raw cell grid. Truncation is surfaced explicitly via "+
+				"'truncated' and 'total_rows_in_range' in the JSON payload. "+services.UntrustedContentNote),
+			mcp.WithString("spreadsheet_id", mcp.Required(), mcp.Description("The spreadsheet ID from the URL")),
+			mcp.WithString("range", mcp.Required(), mcp.Description("A1-notation range (e.g., 'Sheet1!A1:C10')")),
+			mcp.WithNumber("max_rows", mcp.Description("Max rows to return (default 100, max 1000)")),
+			accountParam,
+		),
+		s.sheetsSvc.ReadRange,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "sheets", "write_range"),
+			mcp.WithDescription("Write values to a range in a Google Spreadsheet. "+
+				"values is a JSON array of arrays of scalars (strings/numbers/bools/null). "+
+				"Example: values = [[\"A1\",\"B1\"],[\"A2\",\"B2\"]]. "+
+				"value_input_option defaults to 'USER_ENTERED' (formulas, dates are parsed); "+
+				"pass 'RAW' to write values verbatim. "+services.WriteToolWarning),
+			mcp.WithString("spreadsheet_id", mcp.Required(), mcp.Description("The spreadsheet ID")),
+			mcp.WithString("range", mcp.Required(), mcp.Description("A1-notation range (e.g., 'Sheet1!A1:B2')")),
+			mcp.WithArray("values", mcp.Required(), mcp.Description("2D array of cell values (array of row arrays)")),
+			mcp.WithString("value_input_option", mcp.Description("'RAW' or 'USER_ENTERED' (default)")),
+			accountParam,
+		),
+		s.sheetsSvc.WriteRange,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "sheets", "create"),
+			mcp.WithDescription("Create a new Google Spreadsheet. Optionally seeds "+
+				"the first tab starting at A1 with initial_values (same JSON "+
+				"array-of-arrays shape as write_range). "+services.WriteToolWarning),
+			mcp.WithString("title", mcp.Required(), mcp.Description("Spreadsheet title")),
+			mcp.WithArray("initial_values", mcp.Description("Optional initial cell grid to seed starting at A1")),
+			accountParam,
+		),
+		s.sheetsSvc.Create,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "sheets", "list_tabs"),
+			mcp.WithDescription("List the tabs (sheets) in a Google Spreadsheet "+
+				"with title, sheet ID, and grid dimensions. "+services.UntrustedContentNote),
+			mcp.WithString("spreadsheet_id", mcp.Required(), mcp.Description("The spreadsheet ID")),
+			accountParam,
+		),
+		s.sheetsSvc.ListTabs,
+	)
+}
+
+func (s *Server) registerDocsTools() {
+	accountParam := mcp.WithString("account", mcp.Description("Account label or email. Uses default if omitted."))
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "docs", "read"),
+			mcp.WithDescription("Read a Google Doc as plain text. The structured "+
+				"Docs tree is also included in the JSON payload for callers that "+
+				"need it. Plain text is the primary return — it round-trips "+
+				"with docs.insert_text and docs.replace_text. "+services.UntrustedContentNote),
+			mcp.WithString("document_id", mcp.Required(), mcp.Description("The document ID from the URL")),
+			accountParam,
+		),
+		s.docsSvc.Read,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "docs", "insert_text"),
+			mcp.WithDescription("Insert literal text into a Google Doc. location is "+
+				"'end' (append to document body) or a positive 1-based integer "+
+				"index. No regex — text is inserted literally. "+services.WriteToolWarning),
+			mcp.WithString("document_id", mcp.Required(), mcp.Description("The document ID")),
+			mcp.WithString("text", mcp.Required(), mcp.Description("The text to insert")),
+			mcp.WithString("location", mcp.Description("'end' (default) or a 1-based integer index")),
+			accountParam,
+		),
+		s.docsSvc.InsertText,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "docs", "replace_text"),
+			mcp.WithDescription("Replace all occurrences of a literal substring in "+
+				"a Google Doc. NOT regex — find is matched as a literal substring. "+
+				"match_case defaults to true. Returns the number of occurrences "+
+				"changed. "+services.WriteToolWarning),
+			mcp.WithString("document_id", mcp.Required(), mcp.Description("The document ID")),
+			mcp.WithString("find", mcp.Required(), mcp.Description("The literal substring to find")),
+			mcp.WithString("replace", mcp.Required(), mcp.Description("The replacement text (may be empty to delete matches)")),
+			mcp.WithBoolean("match_case", mcp.Description("Whether the search is case-sensitive (default true)")),
+			accountParam,
+		),
+		s.docsSvc.ReplaceText,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "docs", "create"),
+			mcp.WithDescription("Create a new Google Doc. Optionally inserts "+
+				"initial_text at the start of the body. "+services.WriteToolWarning),
+			mcp.WithString("title", mcp.Required(), mcp.Description("Document title")),
+			mcp.WithString("initial_text", mcp.Description("Optional plain text to insert at the start of the body")),
+			accountParam,
+		),
+		s.docsSvc.Create,
 	)
 }
 

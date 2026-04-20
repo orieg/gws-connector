@@ -58,7 +58,7 @@ func (m *MailService) Search(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	call := svc.Users.Messages.List("me").Q(query).MaxResults(maxResults)
 	resp, err := call.Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("searching mail on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "searching mail on %s: %w", acct.Label, err)), nil
 	}
 
 	if len(resp.Messages) == 0 {
@@ -112,7 +112,7 @@ func (m *MailService) ReadMessage(ctx context.Context, req mcp.CallToolRequest) 
 
 	msg, err := svc.Users.Messages.Get("me", messageId).Format("full").Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("reading message on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "reading message on %s: %w", acct.Label, err)), nil
 	}
 
 	return TextResult(formatMessage(msg, acct, raw)), nil
@@ -135,7 +135,7 @@ func (m *MailService) ReadThread(ctx context.Context, req mcp.CallToolRequest) (
 
 	thread, err := svc.Users.Threads.Get("me", threadId).Format("full").Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("reading thread on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "reading thread on %s: %w", acct.Label, err)), nil
 	}
 
 	var sb strings.Builder
@@ -204,7 +204,7 @@ func (m *MailService) CreateDraft(ctx context.Context, req mcp.CallToolRequest) 
 
 	created, err := svc.Users.Drafts.Create("me", draft).Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("creating draft on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "creating draft on %s: %w", acct.Label, err)), nil
 	}
 
 	return TextResult(fmt.Sprintf(
@@ -227,7 +227,7 @@ func (m *MailService) SendDraft(ctx context.Context, req mcp.CallToolRequest) (*
 
 	msg, err := svc.Users.Drafts.Send("me", &gmail.Draft{Id: draftId}).Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("sending draft on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "sending draft on %s: %w", acct.Label, err)), nil
 	}
 
 	return TextResult(fmt.Sprintf(
@@ -245,7 +245,7 @@ func (m *MailService) ListLabels(ctx context.Context, req mcp.CallToolRequest) (
 
 	resp, err := svc.Users.Labels.List("me").Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("listing labels on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "listing labels on %s: %w", acct.Label, err)), nil
 	}
 
 	var sb strings.Builder
@@ -287,7 +287,7 @@ func (m *MailService) CreateLabel(ctx context.Context, req mcp.CallToolRequest) 
 
 	created, err := svc.Users.Labels.Create("me", label).Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("creating label on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "creating label on %s: %w", acct.Label, err)), nil
 	}
 
 	return TextResult(fmt.Sprintf(
@@ -331,7 +331,7 @@ func (m *MailService) ModifyMessage(ctx context.Context, req mcp.CallToolRequest
 
 	msg, err := svc.Users.Messages.Modify("me", messageId, modReq).Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("modifying message on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "modifying message on %s: %w", acct.Label, err)), nil
 	}
 
 	return TextResult(fmt.Sprintf(
@@ -349,7 +349,7 @@ func (m *MailService) GetProfile(ctx context.Context, req mcp.CallToolRequest) (
 
 	profile, err := svc.Users.GetProfile("me").Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("getting profile for %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "getting profile for %s: %w", acct.Label, err)), nil
 	}
 
 	return TextResult(fmt.Sprintf(

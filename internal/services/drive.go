@@ -60,7 +60,7 @@ func (d *DriveService) Search(ctx context.Context, req mcp.CallToolRequest) (*mc
 
 	resp, err := call.Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("searching drive on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Drive", err, "searching drive on %s: %w", acct.Label, err)), nil
 	}
 
 	if len(resp.Files) == 0 {
@@ -102,7 +102,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 	// Get file metadata first to determine type
 	file, err := svc.Files.Get(fileId).Fields("name, mimeType, size").Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("getting file metadata on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Drive", err, "getting file metadata on %s: %w", acct.Label, err)), nil
 	}
 
 	const maxReadSize = 5 * 1024 * 1024 // 5MB safety limit
@@ -114,7 +114,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 	case "application/vnd.google-apps.document":
 		resp, err := svc.Files.Export(fileId, "text/plain").Download()
 		if err != nil {
-			return ErrorResult(fmt.Errorf("exporting doc on %s: %w", acct.Label, err)), nil
+			return ErrorResult(scopeOrErr(acct, "Drive", err, "exporting doc on %s: %w", acct.Label, err)), nil
 		}
 		defer resp.Body.Close()
 		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
@@ -126,7 +126,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 	case "application/vnd.google-apps.spreadsheet":
 		resp, err := svc.Files.Export(fileId, "text/csv").Download()
 		if err != nil {
-			return ErrorResult(fmt.Errorf("exporting sheet on %s: %w", acct.Label, err)), nil
+			return ErrorResult(scopeOrErr(acct, "Drive", err, "exporting sheet on %s: %w", acct.Label, err)), nil
 		}
 		defer resp.Body.Close()
 		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
@@ -138,7 +138,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 	case "application/vnd.google-apps.presentation":
 		resp, err := svc.Files.Export(fileId, "text/plain").Download()
 		if err != nil {
-			return ErrorResult(fmt.Errorf("exporting slides on %s: %w", acct.Label, err)), nil
+			return ErrorResult(scopeOrErr(acct, "Drive", err, "exporting slides on %s: %w", acct.Label, err)), nil
 		}
 		defer resp.Body.Close()
 		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
@@ -151,7 +151,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 		// Regular file — download content
 		resp, err := svc.Files.Get(fileId).Download()
 		if err != nil {
-			return ErrorResult(fmt.Errorf("downloading file on %s: %w", acct.Label, err)), nil
+			return ErrorResult(scopeOrErr(acct, "Drive", err, "downloading file on %s: %w", acct.Label, err)), nil
 		}
 		defer resp.Body.Close()
 		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
@@ -204,7 +204,7 @@ func (d *DriveService) ListFolder(ctx context.Context, req mcp.CallToolRequest) 
 
 	resp, err := call.Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("listing folder on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Drive", err, "listing folder on %s: %w", acct.Label, err)), nil
 	}
 
 	if len(resp.Files) == 0 {

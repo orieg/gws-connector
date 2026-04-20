@@ -236,7 +236,10 @@ func TestAllToolsRegistered(t *testing.T) {
 		"gws.mail.read_message",
 		"gws.mail.read_thread",
 		"gws.mail.create_draft",
+		"gws.mail.send_draft",
 		"gws.mail.list_labels",
+		"gws.mail.create_label",
+		"gws.mail.modify_message",
 		"gws.mail.get_profile",
 		// Calendar
 		"gws.cal.list_events",
@@ -247,6 +250,16 @@ func TestAllToolsRegistered(t *testing.T) {
 		"gws.drive.search",
 		"gws.drive.read_file",
 		"gws.drive.list_folder",
+		// Sheets
+		"gws.sheets.read_range",
+		"gws.sheets.write_range",
+		"gws.sheets.create",
+		"gws.sheets.list_tabs",
+		// Docs
+		"gws.docs.read",
+		"gws.docs.insert_text",
+		"gws.docs.replace_text",
+		"gws.docs.create",
 	}
 
 	for _, name := range expected {
@@ -268,6 +281,10 @@ func TestToolHasAccountParam(t *testing.T) {
 		"gws.mail.search",
 		"gws.cal.list_events",
 		"gws.drive.search",
+		"gws.sheets.read_range",
+		"gws.sheets.write_range",
+		"gws.docs.read",
+		"gws.docs.insert_text",
 	}
 
 	for _, toolName := range toolsWithAccount {

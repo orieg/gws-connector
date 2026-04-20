@@ -72,7 +72,7 @@ func (c *CalendarService) ListEvents(ctx context.Context, req mcp.CallToolReques
 
 	resp, err := call.Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("listing events on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Calendar", err, "listing events on %s: %w", acct.Label, err)), nil
 	}
 
 	if len(resp.Items) == 0 {
@@ -128,7 +128,7 @@ func (c *CalendarService) GetEvent(ctx context.Context, req mcp.CallToolRequest)
 
 	event, err := svc.Events.Get(calendarId, eventId).Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("getting event on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Calendar", err, "getting event on %s: %w", acct.Label, err)), nil
 	}
 
 	return TextResult(formatEvent(event, acct)), nil
@@ -166,7 +166,7 @@ func (c *CalendarService) CreateEvent(ctx context.Context, req mcp.CallToolReque
 
 	created, err := svc.Events.Insert(calendarId, event).Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("creating event on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Calendar", err, "creating event on %s: %w", acct.Label, err)), nil
 	}
 
 	return TextResult(fmt.Sprintf(
@@ -186,7 +186,7 @@ func (c *CalendarService) ListCalendars(ctx context.Context, req mcp.CallToolReq
 
 	resp, err := svc.CalendarList.List().Do()
 	if err != nil {
-		return ErrorResult(fmt.Errorf("listing calendars on %s: %w", acct.Label, err)), nil
+		return ErrorResult(scopeOrErr(acct, "Calendar", err, "listing calendars on %s: %w", acct.Label, err)), nil
 	}
 
 	var sb strings.Builder
