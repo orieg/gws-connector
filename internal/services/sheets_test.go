@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -102,6 +103,67 @@ func TestRenderCellGrid_FormatsFloatsAndBools(t *testing.T) {
 	}
 }
 
+// A JSON decoder configured with UseNumber() hands us json.Number instead
+// of float64. coerceCellGrid must route those to numeric cell values so
+// "3" goes over the wire to Sheets as 3 (not "3"), and "3.14" as 3.14.
+func TestCoerceCellGrid_HandlesJSONNumber(t *testing.T) {
+	dec := json.NewDecoder(strings.NewReader(`[[3, 3.14, "x", true]]`))
+	dec.UseNumber()
+	var raw any
+	if err := dec.Decode(&raw); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	out, err := coerceCellGrid(raw)
+	if err != nil {
+		t.Fatalf("coerce: %v", err)
+	}
+	if len(out) != 1 || len(out[0]) != 4 {
+		t.Fatalf("grid shape wrong: %v", out)
+	}
+	// "3" should become an integer (int64), not a string.
+	if _, ok := out[0][0].(int64); !ok {
+		t.Errorf("expected int64 for integer JSON number, got %T (%v)", out[0][0], out[0][0])
+	}
+	// "3.14" should become a float64.
+	if _, ok := out[0][1].(float64); !ok {
+		t.Errorf("expected float64 for fractional JSON number, got %T (%v)", out[0][1], out[0][1])
+	}
+	if out[0][2] != "x" || out[0][3] != true {
+		t.Errorf("other scalars wrong: %v", out[0])
+	}
+}
+
+// An invalid json.Number that isn't a parseable int or float falls back to
+// the string form — degrading gracefully rather than erroring the whole
+// write.
+func TestCoerceCellGrid_JSONNumberFallbackToString(t *testing.T) {
+	in := []any{
+		[]any{json.Number("not-a-number")},
+	}
+	out, err := coerceCellGrid(in)
+	if err != nil {
+		t.Fatalf("coerce: %v", err)
+	}
+	if s, ok := out[0][0].(string); !ok || s != "not-a-number" {
+		t.Errorf("expected string fallback, got %T %v", out[0][0], out[0][0])
+	}
+}
+
+func TestCoerceCellGrid_AcceptsNestedAllowedTypes(t *testing.T) {
+	// int32 and int arrive through this package only via tests; ensure the
+	// type-switch arms stay exercised.
+	in := []any{
+		[]any{int(7), int32(8), int64(9)},
+	}
+	out, err := coerceCellGrid(in)
+	if err != nil {
+		t.Fatalf("coerce: %v", err)
+	}
+	if len(out[0]) != 3 {
+		t.Fatalf("shape wrong: %v", out)
+	}
+}
+
 func TestFormatCell_TrueInt(t *testing.T) {
 	if got := formatCell(float64(5)); got != "5" {
 		t.Errorf("expected '5' for 5.0, got %q", got)
@@ -113,3 +175,34 @@ func TestFormatCell_TrueInt(t *testing.T) {
 		t.Errorf("expected empty for nil, got %q", got)
 	}
 }
+
+func TestFormatCell_Bool(t *testing.T) {
+	if got := formatCell(true); got != "TRUE" {
+		t.Errorf("expected 'TRUE' for true, got %q", got)
+	}
+	if got := formatCell(false); got != "FALSE" {
+		t.Errorf("expected 'FALSE' for false, got %q", got)
+	}
+}
+
+func TestFormatCell_UnknownTypeFallsBack(t *testing.T) {
+	// Exercise the default arm — unexpected types still render to SOME
+	// string rather than panic.
+	got := formatCell([]int{1, 2, 3})
+	if got == "" {
+		t.Errorf("unknown type should not render to empty string")
+	}
+}
+
+func TestFormatOptionalError(t *testing.T) {
+	if got := formatOptionalError(nil); got != "" {
+		t.Errorf("expected empty for nil, got %q", got)
+	}
+	if got := formatOptionalError(errorString("boom")); got != "boom" {
+		t.Errorf("expected 'boom', got %q", got)
+	}
+}
+
+type errorString string
+
+func (e errorString) Error() string { return string(e) }

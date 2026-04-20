@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -391,6 +392,18 @@ func coerceCellGrid(raw any) ([][]interface{}, error) {
 				cells = append(cells, v)
 			case int, int32, int64:
 				cells = append(cells, v)
+			case json.Number:
+				// When a JSON decoder is set to UseNumber(), numeric
+				// cells arrive as json.Number rather than float64.
+				// Send numeric form to Sheets so "3" goes over the
+				// wire as 3, not "3".
+				if i, err := v.Int64(); err == nil {
+					cells = append(cells, i)
+				} else if f, err := v.Float64(); err == nil {
+					cells = append(cells, f)
+				} else {
+					cells = append(cells, v.String())
+				}
 			default:
 				return nil, fmt.Errorf("row %d column %d: unsupported cell type %T (must be string, number, bool, or null)", i, j, cell)
 			}

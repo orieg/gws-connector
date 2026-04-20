@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -298,9 +299,13 @@ func appendElementText(sb *strings.Builder, el *docs.StructuralElement) {
 // parse1BasedIndex parses a 1-based string index ("1", "42") and returns
 // the Docs API 0-based UTF-16 index it corresponds to. Preserves the
 // 1-based contract in error messages so callers aren't confused.
+//
+// Uses strconv.ParseInt rather than fmt.Sscanf because Sscanf partially
+// succeeds on malformed input like "10abc" (parsing 10 and ignoring the
+// rest), which would silently accept nonsense.
 func parse1BasedIndex(s string) (int64, error) {
-	var n int64
-	if _, err := fmt.Sscanf(s, "%d", &n); err != nil {
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
 		return 0, fmt.Errorf(
 			"must be 'end' or a positive 1-based integer index (got %q)", s)
 	}

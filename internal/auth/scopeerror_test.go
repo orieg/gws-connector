@@ -63,13 +63,6 @@ func TestCheckScopeError_DetectsGoogleWordings(t *testing.T) {
 			},
 		},
 		{
-			name: "PERMISSION_DENIED marker",
-			err: &googleapi.Error{
-				Code: 403,
-				Body: `{"error":{"status":"PERMISSION_DENIED"}}`,
-			},
-		},
-		{
 			name: "insufficient scope phrase",
 			err: &googleapi.Error{
 				Code:    403,
@@ -113,13 +106,29 @@ func TestCheckScopeError_Ignores403WithoutScopeMarker(t *testing.T) {
 	}
 }
 
-// A non-403 error that happens to contain the marker string must not be
-// treated as scope-insufficient; we rely on the HTTP code when it's
-// available.
+// PERMISSION_DENIED is a generic Google status returned for any 403 —
+// including resource-level IAM issues that reauth will not fix. Ensure
+// it is NOT treated as a scope error on its own; only the more specific
+// markers above should trigger a scope prompt.
+func TestCheckScopeError_IgnoresBarePermissionDenied(t *testing.T) {
+	gerr := &googleapi.Error{
+		Code: 403,
+		Body: `{"error":{"code":403,"status":"PERMISSION_DENIED","message":"The caller does not have permission to access resource."}}`,
+	}
+	out := CheckScopeError(gerr, "l", "e@x", "Sheets")
+	var se *ScopeError
+	if errors.As(out, &se) {
+		t.Errorf("bare PERMISSION_DENIED (no scope marker) must not be a ScopeError — would lead to false reauth prompts for IAM issues")
+	}
+}
+
+// A non-403 error that happens to contain a scope marker string in its
+// body must not be treated as scope-insufficient; we rely on the HTTP
+// code when googleapi.Error tells us one.
 func TestCheckScopeError_Ignores500WithScopeMarkerInBody(t *testing.T) {
 	gerr := &googleapi.Error{
 		Code:    500,
-		Message: "internal — PERMISSION_DENIED somewhere in trace",
+		Message: "internal — ACCESS_TOKEN_SCOPE_INSUFFICIENT somewhere in trace",
 	}
 	out := CheckScopeError(gerr, "l", "e@x", "Sheets")
 	var se *ScopeError
@@ -193,4 +202,58 @@ func TestValidateScopes_MultipleRequiredOneMissing(t *testing.T) {
 func tokenWithScopes(scopes ...string) *oauth2.Token {
 	tok := &oauth2.Token{AccessToken: "x"}
 	return tok.WithExtra(map[string]any{"scope": strings.Join(scopes, " ")})
+}
+
+// Direct tests of the low-level helpers to cover defensive branches not
+// reached through the public API surface.
+
+func TestIsScopeInsufficient_NilErr(t *testing.T) {
+	if isScopeInsufficient(nil) {
+		t.Error("nil err must not be a scope failure")
+	}
+}
+
+func TestGrantedScopes_NilToken(t *testing.T) {
+	if got := grantedScopes(nil); got != nil {
+		t.Errorf("expected nil for nil token, got %v", got)
+	}
+}
+
+func TestGrantedScopes_EmptyString(t *testing.T) {
+	tok := (&oauth2.Token{AccessToken: "x"}).WithExtra(map[string]any{"scope": ""})
+	if got := grantedScopes(tok); got != nil {
+		t.Errorf("expected nil for empty scope string, got %v", got)
+	}
+}
+
+func TestGrantedScopes_NonStringScopeField(t *testing.T) {
+	// Some servers misbehave and return a number or list for "scope" — we
+	// should treat that as "unknown" rather than panic.
+	tok := (&oauth2.Token{AccessToken: "x"}).WithExtra(map[string]any{"scope": 42})
+	if got := grantedScopes(tok); got != nil {
+		t.Errorf("expected nil for non-string scope field, got %v", got)
+	}
+}
+
+func TestGrantedScopes_SpaceSeparated(t *testing.T) {
+	tok := (&oauth2.Token{AccessToken: "x"}).WithExtra(map[string]any{
+		"scope": "a b  c",
+	})
+	got := grantedScopes(tok)
+	if len(got) != 3 || got[0] != "a" || got[2] != "c" {
+		t.Errorf("unexpected parse: %v", got)
+	}
+}
+
+func TestContainsScope(t *testing.T) {
+	got := []string{"a", "b", "c"}
+	if !containsScope(got, "b") {
+		t.Error("expected true for present scope")
+	}
+	if containsScope(got, "d") {
+		t.Error("expected false for missing scope")
+	}
+	if containsScope(nil, "a") {
+		t.Error("expected false for nil set")
+	}
 }

@@ -38,14 +38,18 @@ func (e *ScopeError) Error() string {
 }
 
 // scopeErrorMarkers are substrings Google uses in 403 response bodies /
-// error messages to indicate insufficient OAuth scope. Matched
-// case-insensitively.
+// error messages to indicate insufficient OAuth scope. Stored lowercase
+// and matched against a lowercased message, so we don't pay for
+// strings.ToLower on every marker for every error.
+//
+// PERMISSION_DENIED is deliberately NOT on this list: Google returns it
+// for any 403 (including resource-level IAM issues the user has no scope
+// problem with), so matching on it would surface false reauth prompts.
+// The other markers only appear on genuine scope-insufficient responses.
 var scopeErrorMarkers = []string{
-	"ACCESS_TOKEN_SCOPE_INSUFFICIENT",
+	"access_token_scope_insufficient",
 	"insufficient authentication scopes",
 	"insufficient scope",
-	"PERMISSION_DENIED",
-	"Request had insufficient authentication scopes",
 }
 
 // isScopeInsufficient reports whether the error message matches one of the
@@ -69,7 +73,7 @@ func isScopeInsufficient(err error) bool {
 	}
 	lower := strings.ToLower(msg)
 	for _, marker := range scopeErrorMarkers {
-		if strings.Contains(lower, strings.ToLower(marker)) {
+		if strings.Contains(lower, marker) {
 			return true
 		}
 	}

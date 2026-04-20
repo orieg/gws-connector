@@ -64,6 +64,63 @@ func TestExtractDocPlainText_Table(t *testing.T) {
 	}
 }
 
+// parse1BasedIndex must reject partially-numeric input. This is why we use
+// strconv.ParseInt over fmt.Sscanf — the latter would parse "10abc" as 10.
+func TestParse1BasedIndex_RejectsPartialNumber(t *testing.T) {
+	if _, err := parse1BasedIndex("10abc"); err == nil {
+		t.Error("parse1BasedIndex(\"10abc\") must fail — partial parse would accept nonsense")
+	}
+	if _, err := parse1BasedIndex("3.14"); err == nil {
+		t.Error("parse1BasedIndex(\"3.14\") must fail — fractional not allowed")
+	}
+}
+
+func TestExtractDocPlainText_TableOfContents(t *testing.T) {
+	doc := &docs.Document{
+		Body: &docs.Body{
+			Content: []*docs.StructuralElement{
+				{
+					TableOfContents: &docs.TableOfContents{
+						Content: []*docs.StructuralElement{
+							{
+								Paragraph: &docs.Paragraph{
+									Elements: []*docs.ParagraphElement{
+										{TextRun: &docs.TextRun{Content: "Contents:\n"}},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	got := extractDocPlainText(doc)
+	if !strings.Contains(got, "Contents:") {
+		t.Errorf("expected TOC content flattened into output, got %q", got)
+	}
+}
+
+func TestExtractDocPlainText_IgnoresNilElementsAndEmptyRuns(t *testing.T) {
+	doc := &docs.Document{
+		Body: &docs.Body{
+			Content: []*docs.StructuralElement{
+				nil,
+				{Paragraph: &docs.Paragraph{
+					Elements: []*docs.ParagraphElement{
+						{TextRun: nil},
+						{TextRun: &docs.TextRun{Content: "kept\n"}},
+					},
+				}},
+			},
+		},
+	}
+	got := extractDocPlainText(doc)
+	if got != "kept" {
+		t.Errorf("expected trimmed 'kept', got %q", got)
+	}
+}
+
 func TestParse1BasedIndex(t *testing.T) {
 	cases := []struct {
 		in   string
