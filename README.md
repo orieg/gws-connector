@@ -19,9 +19,28 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Smart routing** — target accounts by label (`work`), email, or domain
 - **Per-account OAuth** — different orgs can use their own GCP credentials
 - **Secure storage** — client secrets and tokens stored in OS keychain (file fallback on Linux without GNOME Keyring)
-- **21 tools** — Mail (search, read, draft, send, labels), Calendar (list, get, create), Drive (search, read, list)
+- **30 tools** — Mail (9), Calendar (4), Drive (3), Sheets (4), Docs (4), account management (6)
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
+
+## Upgrading from v0.2.x
+
+v0.3.0 adds native Google Sheets and Google Docs tools behind two new OAuth
+scopes (`spreadsheets`, `documents`). **Existing users must re-authorize
+each connected account** so new tokens are minted with these scopes:
+
+```
+/gws:reauth
+```
+
+Before approving the browser consent screen, review what the new scopes
+grant — full read and write access to every spreadsheet and document in that
+account's Google Drive, including files shared with the account. See the
+[scope rationale table](#google-cloud-setup) below for details.
+
+You must also add the two new scopes (and enable the Sheets and Docs APIs)
+in your GCP project's OAuth consent screen configuration before re-auth,
+or the consent screen will reject the request.
 
 ## Quick Start (Claude Code)
 
@@ -148,6 +167,14 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.drive.search` | Search files in Drive |
 | `gws.drive.read_file` | Read file content/metadata |
 | `gws.drive.list_folder` | List folder contents |
+| `gws.sheets.read_range` | Read a single A1 range from a spreadsheet |
+| `gws.sheets.write_range` | Write cell values to a range |
+| `gws.sheets.create` | Create a new spreadsheet |
+| `gws.sheets.list_tabs` | List tabs (sheets) in a spreadsheet |
+| `gws.docs.read` | Read a document as plain text |
+| `gws.docs.insert_text` | Insert literal text at a location |
+| `gws.docs.replace_text` | Replace all occurrences of a literal substring |
+| `gws.docs.create` | Create a new document |
 
 ### Skills
 
@@ -172,6 +199,8 @@ One-time setup (~5 minutes):
    - [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
    - [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
    - [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
+   - [Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
+   - [Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
 
 3. **Configure the [OAuth consent screen](https://console.cloud.google.com/auth/consent)**:
    - Choose "External" (or "Internal" for Google Workspace orgs)
@@ -180,13 +209,27 @@ One-time setup (~5 minutes):
 
 4. **Add scopes** — go to [Data Access](https://console.cloud.google.com/auth/scopes):
    - Click "Add or Remove Scopes"
-   - Add these 5 scopes (paste into the "Manually add scopes" box):
+   - Add these 7 scopes (paste into the "Manually add scopes" box):
      - `https://www.googleapis.com/auth/gmail.modify`
      - `https://www.googleapis.com/auth/calendar`
      - `https://www.googleapis.com/auth/drive`
+     - `https://www.googleapis.com/auth/spreadsheets`
+     - `https://www.googleapis.com/auth/documents`
      - `https://www.googleapis.com/auth/userinfo.email`
      - `https://www.googleapis.com/auth/userinfo.profile`
    - Click "Update", then "Save"
+
+   **Why each scope is requested:**
+
+   | Scope | Purpose | Tools |
+   |-------|---------|-------|
+   | `gmail.modify` | Read, draft, modify messages and labels | `gws.mail.*` |
+   | `calendar` | Read and create/update events | `gws.cal.*` |
+   | `drive` | Search and read files and metadata across Drive | `gws.drive.*` |
+   | `spreadsheets` | Read and write Google Sheets cell data and metadata | `gws.sheets.*` |
+   | `documents` | Read and write Google Docs content | `gws.docs.*` |
+   | `userinfo.email` | Identify the authorizing account (email match on reauth) | account management |
+   | `userinfo.profile` | Store a display name alongside the email | account management |
 
 5. **Add test users** — go to [Audience](https://console.cloud.google.com/auth/audience):
    - Add each Google email address you plan to connect

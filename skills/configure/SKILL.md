@@ -35,6 +35,8 @@ Tell the user:
 >    - Gmail API: https://console.cloud.google.com/apis/library/gmail.googleapis.com
 >    - Google Calendar API: https://console.cloud.google.com/apis/library/calendar-json.googleapis.com
 >    - Google Drive API: https://console.cloud.google.com/apis/library/drive.googleapis.com
+>    - Google Sheets API: https://console.cloud.google.com/apis/library/sheets.googleapis.com
+>    - Google Docs API: https://console.cloud.google.com/apis/library/docs.googleapis.com
 >
 > **4. Configure the OAuth consent screen:**
 >    - Go to: https://console.cloud.google.com/auth/consent
@@ -49,9 +51,23 @@ Tell the user:
 >      - `https://www.googleapis.com/auth/gmail.modify`
 >      - `https://www.googleapis.com/auth/calendar`
 >      - `https://www.googleapis.com/auth/drive`
+>      - `https://www.googleapis.com/auth/spreadsheets`
+>      - `https://www.googleapis.com/auth/documents`
 >      - `https://www.googleapis.com/auth/userinfo.email`
 >      - `https://www.googleapis.com/auth/userinfo.profile`
 >    - Click "Update" to confirm, then "Save"
+>
+>    Why each scope is requested:
+>
+>    | Scope | Purpose | Tools using it |
+>    |-------|---------|----------------|
+>    | `gmail.modify` | Read/draft/modify messages and labels | `gws.mail.*` |
+>    | `calendar` | Read/create/update events | `gws.cal.*` |
+>    | `drive` | Search/read files across Drive | `gws.drive.*` |
+>    | `spreadsheets` | Read and write Google Sheets cells and metadata | `gws.sheets.*` |
+>    | `documents` | Read and write Google Docs content | `gws.docs.*` |
+>    | `userinfo.email` | Identify the authorizing account (email match on reauth) | account management |
+>    | `userinfo.profile` | Store a display name alongside the email | account management |
 >
 > **6. Add test users:**
 >    - Go to: https://console.cloud.google.com/auth/audience
