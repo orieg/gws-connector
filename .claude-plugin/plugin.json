@@ -1,7 +1,7 @@
 {
   "name": "gws",
-  "version": "0.2.4",
-  "description": "Multi-account workspace integration — Mail, Calendar, and Drive with smart account routing for Gmail and Google Workspace",
+  "version": "0.3.0",
+  "description": "Multi-account workspace integration — Mail, Calendar, Drive, Sheets, and Docs with smart account routing for Gmail and Google Workspace",
   "author": {
     "name": "orieg",
     "url": "https://github.com/orieg"
@@ -9,7 +9,7 @@
   "repository": "https://github.com/orieg/gws-connector",
   "license": "MIT",
   "keywords": [
-    "gws", "mail", "calendar", "drive", "workspace",
+    "gws", "mail", "calendar", "drive", "sheets", "docs", "workspace",
     "multi-account", "oauth", "mcp"
   ]
 }
