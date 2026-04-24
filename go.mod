@@ -1,9 +1,9 @@
 module github.com/orieg/gws-connector
 
-go 1.25.0
+go 1.25.5
 
 require (
-	github.com/mark3labs/mcp-go v0.48.0
+	github.com/mark3labs/mcp-go v0.49.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.276.0
