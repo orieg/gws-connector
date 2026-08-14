@@ -76,6 +76,35 @@ both humans and AI coding agents).
 - Document it in the README tool table and, for the agent behavioral guide,
   `CONTEXT.md`.
 
+## Releasing & publishing to the MCP Registry
+
+Releases are tag-driven. Pushing a `v*` tag runs
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which:
+
+1. Cross-compiles the four binaries (darwin/linux × amd64/arm64).
+2. Assembles an **MCPB bundle** (`gws-mcp.mcpb`) from
+   [`mcpb/manifest.json`](mcpb/manifest.json) + [`mcpb/launch.sh`](mcpb/launch.sh)
+   + the binaries. `launch.sh` dispatches to the right binary by OS/arch at
+   runtime (MCPB `platform_overrides` only key by OS, not arch).
+3. Renders [`server.json`](server.json) — the `__VERSION__`, `__TAG__`, and
+   `__SHA256__` placeholders are filled from the tag and the bundle's checksum.
+4. Creates the GitHub release with the binaries and `gws-mcp.mcpb` attached.
+5. Publishes `server.json` to the [official MCP Registry](https://registry.modelcontextprotocol.io)
+   via `mcp-publisher` using **GitHub OIDC** (the `io.github.orieg/*` namespace is
+   authorized by the repo owner — no stored token needed).
+
+To validate metadata locally without a release, render the placeholders and run
+the publisher's validator:
+
+```bash
+sed -e 's/__VERSION__/0.0.0/g' -e 's|__TAG__|v0.0.0|g' -e 's/__SHA256__/0/g' \
+  server.json > /tmp/server.json
+# mcp-publisher validate /tmp/server.json   # if mcp-publisher is installed
+```
+
+Do not commit rendered values into `server.json` — keep the placeholders; CI
+fills them per release.
+
 ## Security
 
 Never log tokens or include them in error messages. State files use `0600`

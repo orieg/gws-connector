@@ -126,6 +126,23 @@ Use `/reload-plugins` inside the session after making changes. Run `claude --deb
 
 </details>
 
+<details>
+<summary><strong>Claude Desktop / MCPB bundle</strong></summary>
+
+Each [release](https://github.com/orieg/gws-connector/releases/latest) attaches a
+one-click **`gws-mcp.mcpb`** bundle. Download it and open it with Claude Desktop
+(Settings → Extensions → install from file), or drag it in. The bundle contains
+the binaries for macOS and Linux and picks the right one for your machine
+automatically. You still complete the [Google Cloud setup](#google-cloud-setup)
+and connect accounts on first use.
+
+The server is also published to the
+[official MCP Registry](https://registry.modelcontextprotocol.io) as
+`io.github.orieg/gws-connector`, so MCP clients that browse the registry can find
+and install it directly.
+
+</details>
+
 ## Usage
 
 All `gws.*` tools accept an optional `account` parameter:

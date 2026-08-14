@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write # Required for OIDC auth to the MCP Registry
 
 jobs:
   release:
@@ -29,6 +30,34 @@ jobs:
           GOOS=linux  GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o "${BINARY}-linux-amd64"  ./cmd/gws-mcp
           GOOS=linux  GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o "${BINARY}-linux-arm64"  ./cmd/gws-mcp
 
+      - name: Assemble MCPB bundle
+        run: |
+          TAG=${GITHUB_REF_NAME}
+          VERSION=${TAG#v}
+
+          mkdir -p bundle/server
+          cp gws-mcp-darwin-arm64 gws-mcp-darwin-amd64 gws-mcp-linux-amd64 gws-mcp-linux-arm64 bundle/server/
+          cp mcpb/launch.sh bundle/server/launch.sh
+          chmod +x bundle/server/launch.sh bundle/server/gws-mcp-*
+
+          sed "s/__VERSION__/${VERSION}/g" mcpb/manifest.json > bundle/manifest.json
+
+          (cd bundle && zip -qr -X ../gws-mcp.mcpb manifest.json server)
+          echo "Built gws-mcp.mcpb:"
+          unzip -l gws-mcp.mcpb
+
+      - name: Render server.json (version + asset URL + sha256)
+        run: |
+          TAG=${GITHUB_REF_NAME}
+          VERSION=${TAG#v}
+          SHA=$(sha256sum gws-mcp.mcpb | cut -d' ' -f1)
+          sed -e "s/__VERSION__/${VERSION}/g" \
+              -e "s|__TAG__|${TAG}|g" \
+              -e "s/__SHA256__/${SHA}/g" \
+              server.json > server.rendered.json
+          mv server.rendered.json server.json
+          echo "Rendered server.json:"; cat server.json
+
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
@@ -38,3 +67,16 @@ jobs:
             gws-mcp-darwin-amd64
             gws-mcp-linux-amd64
             gws-mcp-linux-arm64
+            gws-mcp.mcpb
+
+      # Publish to the official MCP Registry. The .mcpb asset must be live on the
+      # release (previous step) so the registry can verify the fileSha256.
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server to MCP Registry
+        run: ./mcp-publisher publish

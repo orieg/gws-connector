@@ -139,6 +139,7 @@ func (s *Server) registerTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "list"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("List all connected Google Workspace accounts with their labels and default status"),
 		),
 		s.handleAccountsList,
@@ -146,6 +147,7 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "add"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Connect a new Google account via OAuth. Opens the browser and returns "+
 				"quickly with a pendingId — call gws.accounts.complete (poll it) to finalize once the "+
 				"user finishes the browser consent. "+
@@ -160,6 +162,7 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "complete"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Finalize a pending OAuth flow started by gws.accounts.add or gws.accounts.reauth. "+
 				"Returns quickly; if the user has not yet completed sign-in, responds with status 'pending' "+
 				"and the caller should call again."),
@@ -180,6 +183,7 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "reauth"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Re-authorize an existing account. Opens the browser and returns quickly "+
 				"with a pendingId — call gws.accounts.complete (poll it) to finalize once the user "+
 				"finishes the browser consent. Does not change account label or settings."),
@@ -190,6 +194,7 @@ func (s *Server) registerTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "accounts", "set_default"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Set the default account used when no account is specified"),
 			mcp.WithString("account", mcp.Required(), mcp.Description("Account label or email to set as default")),
 		),
@@ -516,6 +521,7 @@ func (s *Server) registerMailTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "search"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Search emails using Gmail search syntax (e.g., 'from:user@example.com is:unread')"),
 			mcp.WithString("query", mcp.Description("Gmail search query")),
 			mcp.WithNumber("maxResults", mcp.Description("Maximum messages to return (default: 20)")),
@@ -527,6 +533,7 @@ func (s *Server) registerMailTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "read_message"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Read the full content of an email message"),
 			mcp.WithString("messageId", mcp.Required(), mcp.Description("The message ID")),
 			mcp.WithString("format", mcp.Description("Output format: 'text' (default, HTML converted to plain text) or 'raw' (original HTML preserved)")),
@@ -538,6 +545,7 @@ func (s *Server) registerMailTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "read_thread"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Read all messages in an email thread"),
 			mcp.WithString("threadId", mcp.Required(), mcp.Description("The thread ID")),
 			mcp.WithString("format", mcp.Description("Output format: 'text' (default, HTML converted to plain text) or 'raw' (original HTML preserved)")),
@@ -548,6 +556,7 @@ func (s *Server) registerMailTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "create_draft"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Create an email draft. Supports plain text and HTML bodies."),
 			mcp.WithString("to", mcp.Description("Recipient email(s), comma-separated")),
 			mcp.WithString("subject", mcp.Description("Email subject")),
@@ -563,6 +572,7 @@ func (s *Server) registerMailTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "send_draft"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Send an existing email draft. Use after create_draft to actually send the email."),
 			mcp.WithString("draftId", mcp.Required(), mcp.Description("The draft ID returned by create_draft")),
 			accountParam,
@@ -573,6 +583,7 @@ func (s *Server) registerMailTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "list_labels"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("List all Gmail labels for the account"),
 			accountParam,
 		),
@@ -581,6 +592,7 @@ func (s *Server) registerMailTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "create_label"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Create a new Gmail label"),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Label name (e.g., 'Projects/Alpha')")),
 			mcp.WithString("backgroundColor", mcp.Description("Label background color hex (e.g., '#16a765')")),
@@ -592,6 +604,7 @@ func (s *Server) registerMailTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "modify_message"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Add or remove labels from a Gmail message (use for archiving, starring, marking read/unread, or applying custom labels)"),
 			mcp.WithString("messageId", mcp.Required(), mcp.Description("The message ID")),
 			mcp.WithArray("addLabelIds", mcp.Description("Label IDs to add (e.g., ['STARRED', 'Label_123'])")),
@@ -604,6 +617,7 @@ func (s *Server) registerMailTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "get_profile"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Get Gmail profile info (email, messages total, threads total)"),
 			accountParam,
 		),
@@ -617,6 +631,7 @@ func (s *Server) registerCalendarTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "cal", "list_events"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("List calendar events within a time range"),
 			mcp.WithString("timeMin", mcp.Required(), mcp.Description("Start of range (RFC3339, e.g., 2026-03-26T00:00:00Z)")),
 			mcp.WithString("timeMax", mcp.Required(), mcp.Description("End of range (RFC3339)")),
@@ -631,6 +646,7 @@ func (s *Server) registerCalendarTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "cal", "get_event"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Get full details of a calendar event"),
 			mcp.WithString("eventId", mcp.Required(), mcp.Description("Event ID")),
 			mcp.WithString("calendarId", mcp.Description("Calendar ID (default: primary)")),
@@ -641,6 +657,7 @@ func (s *Server) registerCalendarTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "cal", "create_event"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Create a new calendar event"),
 			mcp.WithString("summary", mcp.Required(), mcp.Description("Event title")),
 			mcp.WithString("start", mcp.Required(), mcp.Description("Start time (RFC3339)")),
@@ -656,6 +673,7 @@ func (s *Server) registerCalendarTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "cal", "list_calendars"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("List all calendars for the account"),
 			accountParam,
 		),
@@ -669,6 +687,7 @@ func (s *Server) registerDriveTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "drive", "search"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Search for files in Google Drive"),
 			mcp.WithString("query", mcp.Required(), mcp.Description("Drive search query (e.g., 'name contains report')")),
 			mcp.WithNumber("maxResults", mcp.Description("Maximum files to return (default: 20)")),
@@ -680,6 +699,7 @@ func (s *Server) registerDriveTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "drive", "read_file"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Read the content of a file from Google Drive"),
 			mcp.WithString("fileId", mcp.Required(), mcp.Description("File ID")),
 			accountParam,
@@ -690,6 +710,7 @@ func (s *Server) registerDriveTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "drive", "list_folder"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("List files in a Drive folder"),
 			mcp.WithString("folderId", mcp.Description("Folder ID (default: root)")),
 			mcp.WithNumber("maxResults", mcp.Description("Maximum files to return (default: 50)")),
@@ -705,6 +726,7 @@ func (s *Server) registerSheetsTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "sheets", "read_range"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Read a single range from a Google Spreadsheet. "+
 				"range uses A1 notation (e.g., 'Sheet1!A1:C10', 'A1:B5'). Response "+
 				"includes a human-readable preview plus a structured JSON payload "+
@@ -737,6 +759,7 @@ func (s *Server) registerSheetsTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "sheets", "create"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Create a new Google Spreadsheet. Optionally seeds "+
 				"the first tab starting at A1 with initial_values (same JSON "+
 				"array-of-arrays shape as write_range). "+services.WriteToolWarning),
@@ -750,6 +773,7 @@ func (s *Server) registerSheetsTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "sheets", "list_tabs"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("List the tabs (sheets) in a Google Spreadsheet "+
 				"with title, sheet ID, and grid dimensions. "+services.UntrustedContentNote),
 			mcp.WithString("spreadsheet_id", mcp.Required(), mcp.Description("The spreadsheet ID")),
@@ -765,6 +789,7 @@ func (s *Server) registerDocsTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "docs", "read"),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Read a Google Doc as plain text. The structured "+
 				"Docs tree is also included in the JSON payload for callers that "+
 				"need it. Plain text is the primary return — it round-trips "+
@@ -777,6 +802,7 @@ func (s *Server) registerDocsTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "docs", "insert_text"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Insert literal text into a Google Doc. location is "+
 				"'end' (append to document body) or a positive 1-based integer "+
 				"index. No regex — text is inserted literally. "+services.WriteToolWarning),
@@ -806,6 +832,7 @@ func (s *Server) registerDocsTools() {
 
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "docs", "create"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Create a new Google Doc. Optionally inserts "+
 				"initial_text at the start of the body. "+services.WriteToolWarning),
 			mcp.WithString("title", mcp.Required(), mcp.Description("Document title")),

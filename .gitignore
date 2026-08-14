@@ -2,6 +2,13 @@
 bin/
 *.exe
 
+# Release / MCPB bundle artifacts (built in CI)
+gws-mcp-darwin-*
+gws-mcp-linux-*
+gws-mcp.mcpb
+bundle/
+server.rendered.json
+
 # Go
 vendor/
 
