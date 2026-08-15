@@ -1,0 +1,21 @@
+# VCS
+.git
+.github
+
+# Build artifacts
+bin/
+bundle/
+*.mcpb
+gws-mcp-darwin-*
+gws-mcp-linux-*
+
+# Docs / site (not needed for the build)
+docs/
+orieg.github.io/
+*.md
+
+# Local/editor state
+.vscode/
+.cursor/
+.claude/
+.DS_Store

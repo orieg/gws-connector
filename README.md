@@ -163,6 +163,29 @@ and install it directly.
 
 </details>
 
+<details>
+<summary><strong>Docker</strong></summary>
+
+A multi-arch image is published to GHCR on each release:
+
+```bash
+docker run -i --rm ghcr.io/orieg/gws-connector:latest
+```
+
+The server speaks MCP over stdio. Interactive OAuth (`accounts.add` / `reauth`)
+opens a browser and stores secrets in the OS keychain, so it needs host access —
+day-to-day use is best via the native binary, the Claude Code plugin, or the
+Gemini extension. The image is well suited to headless stdio integrations and to
+registry/introspection checks. Persist the account registry across runs by
+mounting a volume and pointing `GWS_STATE_DIR` at it:
+
+```bash
+docker run -i --rm -v gws-state:/state -e GWS_STATE_DIR=/state \
+  ghcr.io/orieg/gws-connector:latest
+```
+
+</details>
+
 ## Usage
 
 All `gws.*` tools accept an optional `account` parameter:
