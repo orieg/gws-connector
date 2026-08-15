@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.orieg/gws-connector",
-  "description": "Multi-account Google Workspace MCP server — Gmail, Calendar, Drive, Sheets, and Docs with smart account routing.",
+  "description": "Multi-account Google Workspace MCP — Gmail, Calendar, Drive, Sheets, Docs with smart routing.",
   "repository": {
     "url": "https://github.com/orieg/gws-connector",
     "source": "github"
