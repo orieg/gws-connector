@@ -23,6 +23,26 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
 
+## How it compares
+
+There are several good Google Workspace MCP servers. GWS Connector is the one to
+pick when **multiple accounts** and **operational simplicity** matter:
+
+| | Most GWS MCP servers | **GWS Connector** |
+|---|---|---|
+| **Accounts** | One account per server instance | Unlimited accounts in one instance, routed by label / email / domain |
+| **Multiple orgs** | Shared OAuth app | Per-account OAuth — each org uses its own GCP credentials |
+| **Credential storage** | `.env` / plaintext token files | OS keychain (Keychain / GNOME Keyring / Credential Manager) |
+| **Runtime** | Python/Node + dependencies | Single static Go binary, no runtime to install |
+| **Clients** | Usually one | Claude Code, Gemini CLI, Copilot, Cursor, Codex, any MCP client |
+| **Install** | Manual config | Claude Code plugin, Gemini extension, one-click `.mcpb`, MCP Registry |
+
+If you only ever use a single Google account and want the widest possible tool
+surface (Slides, Forms, Chat, Tasks, …), a single-account server like
+[taylorwilsdon/google_workspace_mcp](https://github.com/taylorwilsdon/google_workspace_mcp)
+may fit better. GWS Connector focuses on doing multi-account Gmail / Calendar /
+Drive / Sheets / Docs cleanly and securely.
+
 ## Upgrading from v0.2.x
 
 v0.3.0 adds native Google Sheets and Google Docs tools behind two new OAuth
@@ -205,6 +225,35 @@ Interactive workflows available in both Claude Code and Gemini CLI:
 | list-accounts | Show connected accounts | `/gws:list-accounts` | "list my GWS accounts" |
 | set-default | Change default account | `/gws:set-default` | "set my default GWS account" |
 | reauth | Refresh tokens/scopes | `/gws:reauth` | "reauth my GWS accounts" |
+
+## Recipes
+
+Once accounts are connected, just ask your assistant in plain language — it picks
+the tools and the account. Examples:
+
+- **Morning triage across accounts** — "Summarize my unread email from the last
+  24 hours across all accounts, grouped by account, and flag anything that needs
+  a reply today."
+- **Draft a reply in a thread** — "Find the thread with Acme about the Q3 invoice
+  on my **work** account and draft a reply confirming the new date. Don't send it."
+- **Turn an email into a calendar event** — "Read the latest message from the
+  events team and create a calendar event on my **personal** calendar with the
+  date and location from it."
+- **Cross-account digest** — "What meetings do I have tomorrow across my work and
+  personal calendars? List them in one timeline."
+- **Find and summarize a doc** — "Search my **client-acme** Drive for the latest
+  'statement of work' and give me the key deliverables and dates."
+- **Log to a spreadsheet** — "Append a row to the 'Expenses' sheet in my personal
+  Drive: today's date, 'AWS', 42.50."
+- **Keep inbox tidy** — "Label all unread messages from newsletters@ as
+  'Newsletters' and mark them read on my **personal** account."
+
+Tips:
+
+- Target an account explicitly with its label ("on my **work** account"), by
+  email, or by domain — otherwise the default account is used.
+- Write operations (drafts, events, sheet/doc edits) are previewed for your
+  confirmation before anything is sent or changed.
 
 ## Google Cloud Setup
 
