@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/orieg/gws-connector/security/advisories/new
+    about: Please report security issues privately, not as public issues. See SECURITY.md.
+  - name: Question / discussion
+    url: https://github.com/orieg/gws-connector/discussions
+    about: Ask questions, share setups, and request help here.
+  - name: Setup help (Google Cloud / OAuth)
+    url: https://github.com/orieg/gws-connector#google-cloud-setup
+    about: The README has a step-by-step Google Cloud setup walkthrough.

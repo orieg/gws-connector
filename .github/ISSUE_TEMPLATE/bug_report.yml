@@ -1,0 +1,64 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please do **not** include OAuth tokens,
+        client secrets, or full email contents. For security vulnerabilities,
+        see [SECURITY.md](../blob/main/SECURITY.md) instead of opening an issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: What did you do? Include the tool call or prompt if relevant.
+      placeholder: |
+        1. Ran `/gws:configure`
+        2. Called gws.mail.search(account: "work", ...)
+        3. Saw ...
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: MCP client
+      options:
+        - Claude Code
+        - Gemini CLI
+        - GitHub Copilot
+        - Cursor
+        - OpenAI Codex
+        - Other MCP client
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Connector version
+      description: "Output of the release tag / binary version (e.g. v0.3.2)"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: "Run the client with debug logging if possible. Redact any tokens or secrets."
+      render: shell
