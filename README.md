@@ -19,7 +19,7 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Smart routing** — target accounts by label (`work`), email, or domain
 - **Per-account OAuth** — different orgs can use their own GCP credentials
 - **Secure storage** — client secrets and tokens stored in OS keychain (file fallback on Linux without GNOME Keyring)
-- **30 tools** — Mail (9), Calendar (4), Drive (3), Sheets (4), Docs (4), account management (6)
+- **33 tools** — Mail (9), Calendar (7), Drive (3), Sheets (4), Docs (4), account management (6)
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
 
@@ -223,6 +223,9 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.cal.list_events` | List calendar events |
 | `gws.cal.get_event` | Get event details |
 | `gws.cal.create_event` | Create a calendar event |
+| `gws.cal.update_event` | Update/reschedule an event (patch semantics) |
+| `gws.cal.delete_event` | Delete/cancel an event |
+| `gws.cal.free_busy` | Query free/busy across calendars |
 | `gws.cal.list_calendars` | List available calendars |
 | `gws.drive.search` | Search files in Drive |
 | `gws.drive.read_file` | Read file content/metadata |

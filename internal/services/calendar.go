@@ -177,6 +177,164 @@ func (c *CalendarService) CreateEvent(ctx context.Context, req mcp.CallToolReque
 	)), nil
 }
 
+// UpdateEvent updates an existing calendar event using patch semantics.
+// Only the fields provided in the request are changed; all other fields on
+// the event are left untouched.
+func (c *CalendarService) UpdateEvent(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+
+	eventId, _ := args["eventId"].(string)
+	if eventId == "" {
+		return ErrorResult(fmt.Errorf("eventId is required")), nil
+	}
+
+	svc, acct, err := c.resolveAndGetService(ctx, args)
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	calendarId, _ := args["calendarId"].(string)
+	if calendarId == "" {
+		calendarId = "primary"
+	}
+
+	// Build a sparse patch: only set fields that were actually provided so
+	// unspecified fields remain untouched by the Events.Patch call.
+	patch := &calendar.Event{}
+	if summary, ok := args["summary"].(string); ok {
+		patch.Summary = summary
+	}
+	if description, ok := args["description"].(string); ok {
+		patch.Description = description
+	}
+	if location, ok := args["location"].(string); ok {
+		patch.Location = location
+	}
+	if start, ok := args["start"].(string); ok && start != "" {
+		patch.Start = &calendar.EventDateTime{DateTime: start}
+	}
+	if end, ok := args["end"].(string); ok && end != "" {
+		patch.End = &calendar.EventDateTime{DateTime: end}
+	}
+
+	updated, err := svc.Events.Patch(calendarId, eventId, patch).Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Calendar", err, "updating event on %s: %w", acct.Label, err)), nil
+	}
+
+	start := updated.Start.DateTime
+	if start == "" {
+		start = updated.Start.Date + " (all day)"
+	}
+	end := updated.End.DateTime
+	if end == "" {
+		end = updated.End.Date
+	}
+
+	return TextResult(fmt.Sprintf(
+		"Event updated on %s (%s):\n  Title: %s\n  Start: %s\n  End: %s\n  ID: %s\n  Link: %s",
+		acct.Label, acct.Email, updated.Summary,
+		start, end, updated.Id, updated.HtmlLink,
+	)), nil
+}
+
+// DeleteEvent deletes (cancels) a calendar event.
+func (c *CalendarService) DeleteEvent(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+
+	eventId, _ := args["eventId"].(string)
+	if eventId == "" {
+		return ErrorResult(fmt.Errorf("eventId is required")), nil
+	}
+
+	svc, acct, err := c.resolveAndGetService(ctx, args)
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	calendarId, _ := args["calendarId"].(string)
+	if calendarId == "" {
+		calendarId = "primary"
+	}
+
+	if err := svc.Events.Delete(calendarId, eventId).Do(); err != nil {
+		return ErrorResult(scopeOrErr(acct, "Calendar", err, "deleting event on %s: %w", acct.Label, err)), nil
+	}
+
+	return TextResult(fmt.Sprintf(
+		"Event deleted on %s (%s):\n  Calendar: %s\n  ID: %s",
+		acct.Label, acct.Email, calendarId, eventId,
+	)), nil
+}
+
+// FreeBusy queries free/busy information for one or more calendars in a range.
+func (c *CalendarService) FreeBusy(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+
+	timeMin, _ := args["timeMin"].(string)
+	timeMax, _ := args["timeMax"].(string)
+	if timeMin == "" || timeMax == "" {
+		return ErrorResult(fmt.Errorf("timeMin and timeMax are required (RFC3339)")), nil
+	}
+
+	svc, acct, err := c.resolveAndGetService(ctx, args)
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	var calendarIds []string
+	if raw, ok := args["calendarIds"].([]any); ok {
+		for _, v := range raw {
+			if s, ok := v.(string); ok && s != "" {
+				calendarIds = append(calendarIds, s)
+			}
+		}
+	}
+	if len(calendarIds) == 0 {
+		calendarIds = []string{"primary"}
+	}
+
+	reqBody := &calendar.FreeBusyRequest{
+		TimeMin: timeMin,
+		TimeMax: timeMax,
+	}
+	for _, id := range calendarIds {
+		reqBody.Items = append(reqBody.Items, &calendar.FreeBusyRequestItem{Id: id})
+	}
+
+	resp, err := svc.Freebusy.Query(reqBody).Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Calendar", err, "querying free/busy on %s: %w", acct.Label, err)), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Free/busy on %s (%s) from %s to %s:\n\n", acct.Label, acct.Email, timeMin, timeMax))
+	for _, id := range calendarIds {
+		cal, ok := resp.Calendars[id]
+		sb.WriteString(fmt.Sprintf("Calendar: %s\n", id))
+		if !ok {
+			sb.WriteString("  (no data returned)\n\n")
+			continue
+		}
+		if len(cal.Errors) > 0 {
+			for _, e := range cal.Errors {
+				sb.WriteString(fmt.Sprintf("  Error: %s\n", e.Reason))
+			}
+		}
+		if len(cal.Busy) == 0 {
+			sb.WriteString("  Free for the entire range.\n\n")
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("  Busy (%d):\n", len(cal.Busy)))
+		for _, b := range cal.Busy {
+			sb.WriteString(fmt.Sprintf("    %s → %s\n", b.Start, b.End))
+		}
+		sb.WriteString("\n")
+	}
+
+	return TextResult(sb.String()), nil
+}
+
 // ListCalendars lists all calendars for the account.
 func (c *CalendarService) ListCalendars(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	svc, acct, err := c.resolveAndGetService(ctx, req.GetArguments())

@@ -35,6 +35,9 @@ At the beginning of a session, if the user hasn't specified what they need:
 
 - Always show times in a human-readable format
 - When creating events, confirm details before calling `gws.cal.create_event`
+- `gws.cal.update_event` uses patch semantics — only the fields you pass change; preview the changes with the user before calling
+- `gws.cal.delete_event` cancels an event for all attendees and cannot be undone — always confirm with the user first
+- Use `gws.cal.free_busy` to find open slots before scheduling
 - Use `gws.cal.list_calendars` to discover available calendars if needed
 
 ## Drive Operations
