@@ -19,7 +19,7 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Smart routing** — target accounts by label (`work`), email, or domain
 - **Per-account OAuth** — different orgs can use their own GCP credentials
 - **Secure storage** — client secrets and tokens stored in OS keychain (file fallback on Linux without GNOME Keyring)
-- **37 tools** — Mail (9), Calendar (7), Drive (3), Sheets (6), Docs (4), Contacts (2), account management (6)
+- **42 tools** — Mail (9), Calendar (7), Drive (3), Sheets (6), Docs (4), Contacts (2), Tasks (5), account management (6)
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
 
@@ -38,10 +38,30 @@ pick when **multiple accounts** and **operational simplicity** matter:
 | **Install** | Manual config | Claude Code plugin, Gemini extension, one-click `.mcpb`, MCP Registry |
 
 If you only ever use a single Google account and want the widest possible tool
-surface (Slides, Forms, Chat, Tasks, …), a single-account server like
+surface (Slides, Forms, Chat, …), a single-account server like
 [taylorwilsdon/google_workspace_mcp](https://github.com/taylorwilsdon/google_workspace_mcp)
 may fit better. GWS Connector focuses on doing multi-account Gmail / Calendar /
-Drive / Sheets / Docs cleanly and securely.
+Drive / Sheets / Docs / Tasks cleanly and securely.
+
+## Upgrading (Google Tasks)
+
+The Google Tasks tools (`gws.tasks.*`) are added behind one new OAuth scope
+(`tasks`). **Existing users must re-authorize each connected account** so new
+tokens are minted with this scope:
+
+```
+/gws:reauth
+```
+
+Before approving the browser consent screen, review what the new scope grants —
+full read and write access to the account's Google Tasks lists and tasks. See
+the [scope rationale table](#google-cloud-setup) below for details.
+
+You must also add the `tasks` scope and enable the **Tasks API** in your GCP
+project's OAuth consent screen configuration before re-auth, or the consent
+screen will reject the request. Until an account is re-authorized, the
+`gws.tasks.*` tools return an insufficient-scope error naming the reauth tool
+to run.
 
 ## Upgrading — Contacts / People API
 
@@ -264,6 +284,11 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.docs.create` | Create a new document |
 | `gws.contacts.search` | Search your own contacts by name/email/phone (returns name, emails, phones) |
 | `gws.contacts.directory_search` | Search the Workspace org directory (returns name, emails); Workspace accounts only |
+| `gws.tasks.list_tasklists` | List the account's task lists |
+| `gws.tasks.list` | List tasks in a list (add `showCompleted` for done tasks) |
+| `gws.tasks.create` | Create a task (`due` is RFC3339; only the date is stored) |
+| `gws.tasks.complete` | Mark a task completed (reversible) |
+| `gws.tasks.delete` | Permanently delete a task |
 
 ### Skills
 
@@ -320,6 +345,7 @@ One-time setup (~5 minutes):
    - [Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
    - [Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
    - [People API](https://console.cloud.google.com/apis/library/people.googleapis.com)
+   - [Tasks API](https://console.cloud.google.com/apis/library/tasks.googleapis.com)
 
 3. **Configure the [OAuth consent screen](https://console.cloud.google.com/auth/consent)**:
    - Choose "External" (or "Internal" for Google Workspace orgs)
@@ -328,7 +354,7 @@ One-time setup (~5 minutes):
 
 4. **Add scopes** — go to [Data Access](https://console.cloud.google.com/auth/scopes):
    - Click "Add or Remove Scopes"
-   - Add these 9 scopes (paste into the "Manually add scopes" box):
+   - Add these 10 scopes (paste into the "Manually add scopes" box):
      - `https://www.googleapis.com/auth/gmail.modify`
      - `https://www.googleapis.com/auth/calendar`
      - `https://www.googleapis.com/auth/drive`
@@ -336,6 +362,7 @@ One-time setup (~5 minutes):
      - `https://www.googleapis.com/auth/documents`
      - `https://www.googleapis.com/auth/contacts.readonly`
      - `https://www.googleapis.com/auth/directory.readonly`
+     - `https://www.googleapis.com/auth/tasks`
      - `https://www.googleapis.com/auth/userinfo.email`
      - `https://www.googleapis.com/auth/userinfo.profile`
    - Click "Update", then "Save"
@@ -351,6 +378,7 @@ One-time setup (~5 minutes):
    | `documents` | Read and write Google Docs content | `gws.docs.*` |
    | `contacts.readonly` | Read-only search of your own Google Contacts | `gws.contacts.search` |
    | `directory.readonly` | Read-only search of the Workspace org directory (Workspace accounts only) | `gws.contacts.directory_search` |
+   | `tasks` | Read and write Google Tasks lists and tasks | `gws.tasks.*` |
    | `userinfo.email` | Identify the authorizing account (email match on reauth) | account management |
    | `userinfo.profile` | Store a display name alongside the email | account management |
 

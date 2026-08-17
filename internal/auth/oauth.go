@@ -37,6 +37,7 @@ var Scopes = []string{
 	"https://www.googleapis.com/auth/userinfo.profile",
 	"https://www.googleapis.com/auth/contacts.readonly",
 	"https://www.googleapis.com/auth/directory.readonly",
+	"https://www.googleapis.com/auth/tasks",
 }
 
 // ScopeSheets is the Google Sheets API full-access scope.
@@ -54,6 +55,9 @@ const ScopeContacts = "https://www.googleapis.com/auth/contacts.readonly"
 // organization directory (used by contacts.directory_search). Only meaningful
 // for Workspace accounts; personal Gmail accounts have no directory.
 const ScopeDirectory = "https://www.googleapis.com/auth/directory.readonly"
+
+// ScopeTasks is the Google Tasks API full-access scope.
+const ScopeTasks = "https://www.googleapis.com/auth/tasks"
 
 // UserInfo holds the authenticated user's profile.
 type UserInfo struct {

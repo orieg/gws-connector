@@ -14,6 +14,7 @@ import (
 	"google.golang.org/api/option"
 	people "google.golang.org/api/people/v1"
 	sheets "google.golang.org/api/sheets/v4"
+	tasks "google.golang.org/api/tasks/v1"
 )
 
 // AccountCredentials provides per-account OAuth client ID lookup.
@@ -163,6 +164,19 @@ func (f *ClientFactory) PeopleService(ctx context.Context, email string) (*peopl
 		return nil, err
 	}
 	return people.NewService(ctx, option.WithHTTPClient(client))
+}
+
+// TasksService returns an authenticated Tasks service for the account.
+// Same proactive-scope behavior as SheetsService.
+func (f *ClientFactory) TasksService(ctx context.Context, email string) (*tasks.Service, error) {
+	if err := f.ensureScope(email, ScopeTasks, "Tasks"); err != nil {
+		return nil, err
+	}
+	client, err := f.httpClient(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return tasks.NewService(ctx, option.WithHTTPClient(client))
 }
 
 // ensureScope loads the account's token and runs ValidateScopes against it.

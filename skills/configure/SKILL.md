@@ -38,6 +38,7 @@ Tell the user:
 >    - Google Sheets API: https://console.cloud.google.com/apis/library/sheets.googleapis.com
 >    - Google Docs API: https://console.cloud.google.com/apis/library/docs.googleapis.com
 >    - Google People API: https://console.cloud.google.com/apis/library/people.googleapis.com
+>    - Google Tasks API: https://console.cloud.google.com/apis/library/tasks.googleapis.com
 >
 > **4. Configure the OAuth consent screen:**
 >    - Go to: https://console.cloud.google.com/auth/consent
@@ -56,6 +57,7 @@ Tell the user:
 >      - `https://www.googleapis.com/auth/documents`
 >      - `https://www.googleapis.com/auth/contacts.readonly`
 >      - `https://www.googleapis.com/auth/directory.readonly`
+>      - `https://www.googleapis.com/auth/tasks`
 >      - `https://www.googleapis.com/auth/userinfo.email`
 >      - `https://www.googleapis.com/auth/userinfo.profile`
 >    - Click "Update" to confirm, then "Save"
@@ -71,6 +73,7 @@ Tell the user:
 >    | `documents` | Read and write Google Docs content | `gws.docs.*` |
 >    | `contacts.readonly` | Read-only search of your own Google Contacts | `gws.contacts.search` |
 >    | `directory.readonly` | Read-only search of the Workspace org directory (Workspace accounts only) | `gws.contacts.directory_search` |
+>    | `tasks` | Read and write Google Tasks lists and tasks | `gws.tasks.*` |
 >    | `userinfo.email` | Identify the authorizing account (email match on reauth) | account management |
 >    | `userinfo.profile` | Store a display name alongside the email | account management |
 >
