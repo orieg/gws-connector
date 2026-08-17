@@ -35,6 +35,8 @@ var Scopes = []string{
 	"https://www.googleapis.com/auth/documents",
 	"https://www.googleapis.com/auth/userinfo.email",
 	"https://www.googleapis.com/auth/userinfo.profile",
+	"https://www.googleapis.com/auth/contacts.readonly",
+	"https://www.googleapis.com/auth/directory.readonly",
 }
 
 // ScopeSheets is the Google Sheets API full-access scope.
@@ -42,6 +44,16 @@ const ScopeSheets = "https://www.googleapis.com/auth/spreadsheets"
 
 // ScopeDocs is the Google Docs API full-access scope.
 const ScopeDocs = "https://www.googleapis.com/auth/documents"
+
+// ScopeContacts is the People API read-only scope for the user's own
+// contacts (used by contacts.search). Read-only — the connector only
+// searches contacts, it never mutates them.
+const ScopeContacts = "https://www.googleapis.com/auth/contacts.readonly"
+
+// ScopeDirectory is the People API read-only scope for the Google Workspace
+// organization directory (used by contacts.directory_search). Only meaningful
+// for Workspace accounts; personal Gmail accounts have no directory.
+const ScopeDirectory = "https://www.googleapis.com/auth/directory.readonly"
 
 // UserInfo holds the authenticated user's profile.
 type UserInfo struct {

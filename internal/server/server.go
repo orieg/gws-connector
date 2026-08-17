@@ -73,6 +73,7 @@ type Server struct {
 	driveSvc      *services.DriveService
 	sheetsSvc     *services.SheetsService
 	docsSvc       *services.DocsService
+	contactsSvc   *services.ContactsService
 
 	pendingMu sync.Mutex
 	pending   map[string]*pendingSession
@@ -96,6 +97,7 @@ func New(cfg Config) *Server {
 		driveSvc:      services.NewDriveService(router, clientFactory),
 		sheetsSvc:     services.NewSheetsService(router, clientFactory),
 		docsSvc:       services.NewDocsService(router, clientFactory),
+		contactsSvc:   services.NewContactsService(router, clientFactory),
 		pending:       make(map[string]*pendingSession),
 	}
 
@@ -215,6 +217,9 @@ func (s *Server) registerTools() {
 
 	// Docs tools
 	s.registerDocsTools()
+
+	// Contacts / People tools
+	s.registerContactsTools()
 }
 
 // Serve starts the MCP server on stdio.
@@ -957,6 +962,43 @@ func (s *Server) registerDocsTools() {
 			accountParam,
 		),
 		s.docsSvc.Create,
+	)
+}
+
+func (s *Server) registerContactsTools() {
+	accountParam := mcp.WithString("account", mcp.Description("Account label or email. Uses default if omitted."))
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "contacts", "search"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			// Read-only lookup. Must be set explicitly — NewTool defaults
+			// destructiveHint to true.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Search the account's own Google Contacts by name, "+
+				"nickname, email, or phone. Use it to resolve a person's name to an "+
+				"email address (e.g. before drafting mail) or to look up their phone "+
+				"number. Returns each match's display name, email addresses, and phone "+
+				"numbers. Read-only — it never modifies contacts."),
+			mcp.WithString("query", mcp.Required(), mcp.Description("Search text matched against contact name, email, and phone")),
+			mcp.WithNumber("maxResults", mcp.Description("Maximum contacts to return (default: 20, max: 30)")),
+			accountParam,
+		),
+		s.contactsSvc.Search,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "contacts", "directory_search"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Search the Google Workspace organization directory "+
+				"(coworkers/domain profiles) by name or email. Returns each match's "+
+				"display name and email addresses. Read-only. Only works for Google "+
+				"Workspace accounts — personal Gmail accounts have no directory and get "+
+				"a clear explanatory message instead of results."),
+			mcp.WithString("query", mcp.Required(), mcp.Description("Search text matched against directory member name and email")),
+			accountParam,
+		),
+		s.contactsSvc.DirectorySearch,
 	)
 }
 

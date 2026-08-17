@@ -17,6 +17,8 @@ func TestScopesContainsSheetsAndDocs(t *testing.T) {
 		"https://www.googleapis.com/auth/drive",
 		ScopeSheets,
 		ScopeDocs,
+		ScopeContacts,
+		ScopeDirectory,
 		"https://www.googleapis.com/auth/userinfo.email",
 		"https://www.googleapis.com/auth/userinfo.profile",
 	}
@@ -33,5 +35,14 @@ func TestScopeSheetsAndDocsConstantsMatchEntry(t *testing.T) {
 	}
 	if ScopeDocs != "https://www.googleapis.com/auth/documents" {
 		t.Errorf("ScopeDocs constant drifted: %s", ScopeDocs)
+	}
+}
+
+func TestScopeContactsAndDirectoryConstantsMatchEntry(t *testing.T) {
+	if ScopeContacts != "https://www.googleapis.com/auth/contacts.readonly" {
+		t.Errorf("ScopeContacts constant drifted: %s", ScopeContacts)
+	}
+	if ScopeDirectory != "https://www.googleapis.com/auth/directory.readonly" {
+		t.Errorf("ScopeDirectory constant drifted: %s", ScopeDirectory)
 	}
 }
