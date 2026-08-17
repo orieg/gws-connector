@@ -38,10 +38,10 @@ pick when **multiple accounts** and **operational simplicity** matter:
 | **Install** | Manual config | Claude Code plugin, Gemini extension, one-click `.mcpb`, MCP Registry |
 
 If you only ever use a single Google account and want the widest possible tool
-surface (Slides, Forms, Chat, …), a single-account server like
+surface (Forms, Chat, Vault, …), a single-account server like
 [taylorwilsdon/google_workspace_mcp](https://github.com/taylorwilsdon/google_workspace_mcp)
 may fit better. GWS Connector focuses on doing multi-account Gmail / Calendar /
-Drive / Sheets / Docs / Tasks cleanly and securely.
+Drive / Sheets / Docs / Contacts / Tasks / Slides cleanly and securely.
 
 ## Upgrading (Google Tasks)
 
