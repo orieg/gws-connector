@@ -12,7 +12,10 @@ import (
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/option"
+	people "google.golang.org/api/people/v1"
 	sheets "google.golang.org/api/sheets/v4"
+	slides "google.golang.org/api/slides/v1"
+	tasks "google.golang.org/api/tasks/v1"
 )
 
 // AccountCredentials provides per-account OAuth client ID lookup.
@@ -24,10 +27,10 @@ type AccountCredentials interface {
 
 // ClientFactory creates authenticated Google API service clients for accounts.
 type ClientFactory struct {
-	tokenStore       *TokenStore
-	globalClientID   string
-	globalClientSec  string
-	accountCreds     AccountCredentials
+	tokenStore      *TokenStore
+	globalClientID  string
+	globalClientSec string
+	accountCreds    AccountCredentials
 }
 
 // NewClientFactory creates a new factory. accountCreds can be nil if no
@@ -142,6 +145,54 @@ func (f *ClientFactory) DocsService(ctx context.Context, email string) (*docs.Se
 		return nil, err
 	}
 	return docs.NewService(ctx, option.WithHTTPClient(client))
+}
+
+// PeopleService returns an authenticated People API service for the account.
+//
+// Same proactive-scope behavior as SheetsService: if the account's stored
+// token does not carry the Contacts read-only scope — common for users
+// upgrading from releases that pre-date Contacts support — this returns a
+// *ScopeError immediately, without hitting the Google API, so the agent is
+// told which reauth tool to call. The directory.readonly scope is validated
+// lazily by the directory_search handler (it only applies to Workspace
+// accounts) rather than gating the whole service.
+func (f *ClientFactory) PeopleService(ctx context.Context, email string) (*people.Service, error) {
+	if err := f.ensureScope(email, ScopeContacts, "Contacts"); err != nil {
+		return nil, err
+	}
+	client, err := f.httpClient(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return people.NewService(ctx, option.WithHTTPClient(client))
+}
+
+// TasksService returns an authenticated Tasks service for the account.
+// Same proactive-scope behavior as SheetsService.
+func (f *ClientFactory) TasksService(ctx context.Context, email string) (*tasks.Service, error) {
+	if err := f.ensureScope(email, ScopeTasks, "Tasks"); err != nil {
+		return nil, err
+	}
+	client, err := f.httpClient(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return tasks.NewService(ctx, option.WithHTTPClient(client))
+}
+
+// SlidesService returns an authenticated Slides service for the account.
+// Same proactive-scope behavior as SheetsService/DocsService: a token that
+// pre-dates Slides support (issue #67) is caught here with a *ScopeError
+// before any API call, telling the agent to run gws.accounts.reauth.
+func (f *ClientFactory) SlidesService(ctx context.Context, email string) (*slides.Service, error) {
+	if err := f.ensureScope(email, ScopePresentations, "Slides"); err != nil {
+		return nil, err
+	}
+	client, err := f.httpClient(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return slides.NewService(ctx, option.WithHTTPClient(client))
 }
 
 // ensureScope loads the account's token and runs ValidateScopes against it.

@@ -73,6 +73,9 @@ type Server struct {
 	driveSvc      *services.DriveService
 	sheetsSvc     *services.SheetsService
 	docsSvc       *services.DocsService
+	contactsSvc   *services.ContactsService
+	taskSvc       *services.TasksService
+	slidesSvc     *services.SlidesService
 
 	pendingMu sync.Mutex
 	pending   map[string]*pendingSession
@@ -96,6 +99,9 @@ func New(cfg Config) *Server {
 		driveSvc:      services.NewDriveService(router, clientFactory),
 		sheetsSvc:     services.NewSheetsService(router, clientFactory),
 		docsSvc:       services.NewDocsService(router, clientFactory),
+		contactsSvc:   services.NewContactsService(router, clientFactory),
+		taskSvc:       services.NewTasksService(router, clientFactory),
+		slidesSvc:     services.NewSlidesService(router, clientFactory),
 		pending:       make(map[string]*pendingSession),
 	}
 
@@ -215,6 +221,15 @@ func (s *Server) registerTools() {
 
 	// Docs tools
 	s.registerDocsTools()
+
+	// Contacts / People tools
+	s.registerContactsTools()
+
+	// Tasks tools
+	s.registerTasksTools()
+
+	// Slides tools
+	s.registerSlidesTools()
 }
 
 // Serve starts the MCP server on stdio.
@@ -578,6 +593,42 @@ func (s *Server) registerMailTools() {
 			accountParam,
 		),
 		s.mailSvc.SendDraft,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "mail", "forward"),
+			// Additive: builds a DRAFT, never sends and never modifies the
+			// original message. NewTool defaults destructiveHint to true, so
+			// it must be set false explicitly.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Build a forward DRAFT of an existing message (does NOT send). "+
+				"The draft carries the original message's headers and body in the standard "+
+				"forwarded-message block, optionally prepended with a note. Returns the draft "+
+				"ID — send it with mail.send_draft. Attachments are listed by filename in the "+
+				"quoted block but not re-attached; use mail.get_attachment to pull their bytes."),
+			mcp.WithString("messageId", mcp.Required(), mcp.Description("The message ID to forward")),
+			mcp.WithString("to", mcp.Required(), mcp.Description("Recipient email(s), comma-separated")),
+			mcp.WithString("cc", mcp.Description("CC recipients, comma-separated")),
+			mcp.WithString("bcc", mcp.Description("BCC recipients, comma-separated")),
+			mcp.WithString("comment", mcp.Description("Optional note prepended above the forwarded content")),
+			accountParam,
+		),
+		s.mailSvc.Forward,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "mail", "get_attachment"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Fetch a single attachment's bytes from a message. The attachmentId "+
+				"comes from mail.read_message / mail.read_thread, which list each attachment's "+
+				"filename and attachmentId. Returns the filename, MIME type, size, and the "+
+				"attachment bytes base64-encoded in the JSON payload (data_base64). "+services.UntrustedContentNote),
+			mcp.WithString("messageId", mcp.Required(), mcp.Description("The message ID the attachment belongs to")),
+			mcp.WithString("attachmentId", mcp.Required(), mcp.Description("The attachment ID (from read_message/read_thread)")),
+			accountParam,
+		),
+		s.mailSvc.GetAttachment,
 	)
 
 	s.mcpServer.AddTool(
@@ -957,6 +1008,174 @@ func (s *Server) registerDocsTools() {
 			accountParam,
 		),
 		s.docsSvc.Create,
+	)
+}
+
+func (s *Server) registerContactsTools() {
+	accountParam := mcp.WithString("account", mcp.Description("Account label or email. Uses default if omitted."))
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "contacts", "search"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			// Read-only lookup. Must be set explicitly — NewTool defaults
+			// destructiveHint to true.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Search the account's own Google Contacts by name, "+
+				"nickname, email, or phone. Use it to resolve a person's name to an "+
+				"email address (e.g. before drafting mail) or to look up their phone "+
+				"number. Returns each match's display name, email addresses, and phone "+
+				"numbers. Read-only — it never modifies contacts."),
+			mcp.WithString("query", mcp.Required(), mcp.Description("Search text matched against contact name, email, and phone")),
+			mcp.WithNumber("maxResults", mcp.Description("Maximum contacts to return (default: 20, max: 30)")),
+			accountParam,
+		),
+		s.contactsSvc.Search,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "contacts", "directory_search"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Search the Google Workspace organization directory "+
+				"(coworkers/domain profiles) by name or email. Returns each match's "+
+				"display name and email addresses. Read-only. Only works for Google "+
+				"Workspace accounts — personal Gmail accounts have no directory and get "+
+				"a clear explanatory message instead of results."),
+			mcp.WithString("query", mcp.Required(), mcp.Description("Search text matched against directory member name and email")),
+			accountParam,
+		),
+		s.contactsSvc.DirectorySearch,
+	)
+}
+
+func (s *Server) registerTasksTools() {
+	accountParam := mcp.WithString("account", mcp.Description("Account label or email. Uses default if omitted."))
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "list_tasklists"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("List the account's Google Tasks task lists. Returns "+
+				"each list's title and ID. Use a returned list ID as the 'tasklist' "+
+				"argument to the other tasks tools; omit 'tasklist' there to target "+
+				"the account's default list ('@default')."),
+			accountParam,
+		),
+		s.taskSvc.ListTasklists,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "list"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("List the tasks in a task list. Returns each task's "+
+				"title, status (needsAction/completed), due date, notes, and ID. "+
+				"tasklist defaults to the account's default list ('@default'). By "+
+				"default only active tasks are returned; set showCompleted=true to "+
+				"include completed ones."),
+			mcp.WithString("tasklist", mcp.Description("Task list ID (default: '@default')")),
+			mcp.WithBoolean("showCompleted", mcp.Description("Include completed tasks (default: false)")),
+			accountParam,
+		),
+		s.taskSvc.ListTasks,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "create"),
+			// Additive: inserts a new task, never removes or overwrites existing
+			// data. NewTool defaults destructiveHint to true, so set it false.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Create a new task in a task list. title is required. "+
+				"due is an RFC3339 timestamp (only the date portion is stored by "+
+				"Google Tasks — the time is discarded). tasklist defaults to the "+
+				"account's default list ('@default'). Returns the new task's title, "+
+				"due date, and ID."),
+			mcp.WithString("title", mcp.Required(), mcp.Description("Task title")),
+			mcp.WithString("notes", mcp.Description("Free-text notes/description for the task")),
+			mcp.WithString("due", mcp.Description("Due date (RFC3339, e.g. 2026-08-20T00:00:00Z; only the date is stored)")),
+			mcp.WithString("tasklist", mcp.Description("Task list ID (default: '@default')")),
+			accountParam,
+		),
+		s.taskSvc.Create,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "complete"),
+			// Reversible modify: sets status to completed; the task still exists
+			// and can be reopened. NewTool defaults destructiveHint to true.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Mark a task as completed (sets its status to "+
+				"'completed'). This is reversible — the task is not deleted. "+
+				"tasklist defaults to the account's default list ('@default'). "+
+				"Returns the task's title, new status, and ID."),
+			mcp.WithString("taskId", mcp.Required(), mcp.Description("Task ID to complete")),
+			mcp.WithString("tasklist", mcp.Description("Task list ID (default: '@default')")),
+			accountParam,
+		),
+		s.taskSvc.Complete,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "delete"),
+			// Genuinely destructive: permanently removes the task.
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithDescription("Permanently delete a task from a task list. This "+
+				"cannot be undone — confirm with the user before calling. To mark a "+
+				"task done without removing it, use tasks.complete instead. tasklist "+
+				"defaults to the account's default list ('@default'). Returns the "+
+				"deleted task's ID and list."),
+			mcp.WithString("taskId", mcp.Required(), mcp.Description("Task ID to delete")),
+			mcp.WithString("tasklist", mcp.Description("Task list ID (default: '@default')")),
+			accountParam,
+		),
+		s.taskSvc.Delete,
+	)
+}
+
+func (s *Server) registerSlidesTools() {
+	accountParam := mcp.WithString("account", mcp.Description("Account label or email. Uses default if omitted."))
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "slides", "get"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Read a Google Slides presentation: the slide count plus a "+
+				"per-slide plain-text summary (text boxes, shapes, and table cells). The raw "+
+				"slides structural tree is included in the JSON payload for callers that need "+
+				"it. "+services.UntrustedContentNote),
+			mcp.WithString("presentation_id", mcp.Required(), mcp.Description("The presentation ID from the URL")),
+			accountParam,
+		),
+		s.slidesSvc.Get,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "slides", "create"),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Create a new Google Slides presentation with the given title. "+
+				"Returns the new presentation's ID and URL. Add slides and content with "+
+				"slides.batch_update. "+services.CreateToolNote),
+			mcp.WithString("title", mcp.Required(), mcp.Description("Presentation title")),
+			accountParam,
+		),
+		s.slidesSvc.Create,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "slides", "batch_update"),
+			// Modifies existing presentation content (create/insert/delete
+			// slides and elements). Genuinely destructive.
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithDescription("Apply a batch of raw Slides API requests to an existing "+
+				"presentation. requests is a JSON array of Slides API Request objects (e.g. "+
+				"createSlide, insertText, deleteObject, replaceAllText) exactly as documented "+
+				"in the Slides API reference. This is the general-purpose editing primitive; "+
+				"the caller constructs valid request objects. "+services.WriteToolWarning),
+			mcp.WithString("presentation_id", mcp.Required(), mcp.Description("The presentation ID")),
+			mcp.WithArray("requests", mcp.Required(), mcp.Description("JSON array of Slides API request objects (e.g. [{\"createSlide\": {...}}, {\"insertText\": {...}}])")),
+			accountParam,
+		),
+		s.slidesSvc.BatchUpdate,
 	)
 }
 
