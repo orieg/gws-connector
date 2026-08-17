@@ -593,7 +593,9 @@ func (s *Server) registerMailTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "mail", "create_label"),
 			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithDescription("Create a new Gmail label"),
+			mcp.WithDescription("Create a new Gmail label. Use '/' in the name to "+
+				"nest under a parent (e.g. 'Projects/Alpha'). Returns the new label's "+
+				"ID, which you pass to mail.modify_message to apply it."),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Label name (e.g., 'Projects/Alpha')")),
 			mcp.WithString("backgroundColor", mcp.Description("Label background color hex (e.g., '#16a765')")),
 			mcp.WithString("textColor", mcp.Description("Label text color hex (e.g., '#ffffff')")),
@@ -658,7 +660,11 @@ func (s *Server) registerCalendarTools() {
 	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "cal", "create_event"),
 			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithDescription("Create a new calendar event"),
+			mcp.WithDescription("Create a calendar event on the account's calendar. "+
+				"start and end are RFC3339 timestamps (include the timezone offset). "+
+				"Defaults to the primary calendar unless calendarId is given. Returns "+
+				"the created event's ID and link. Preview the details with the user "+
+				"before calling."),
 			mcp.WithString("summary", mcp.Required(), mcp.Description("Event title")),
 			mcp.WithString("start", mcp.Required(), mcp.Description("Start time (RFC3339)")),
 			mcp.WithString("end", mcp.Required(), mcp.Description("End time (RFC3339)")),
@@ -688,8 +694,11 @@ func (s *Server) registerDriveTools() {
 		mcp.NewTool(s.toolName("gws", "drive", "search"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithDescription("Search for files in Google Drive"),
-			mcp.WithString("query", mcp.Required(), mcp.Description("Drive search query (e.g., 'name contains report')")),
+			mcp.WithDescription("Search for files across the account's Google Drive "+
+				"using Drive query syntax. Returns each match's file ID, name, MIME "+
+				"type, modified time, size, owners, and web link. Use the returned "+
+				"file ID with drive.read_file or drive.list_folder."),
+			mcp.WithString("query", mcp.Required(), mcp.Description("Drive search query (e.g., \"name contains 'report'\", \"mimeType = 'application/pdf'\", \"'<folderId>' in parents\")")),
 			mcp.WithNumber("maxResults", mcp.Description("Maximum files to return (default: 20)")),
 			accountParam,
 		),
@@ -700,7 +709,11 @@ func (s *Server) registerDriveTools() {
 		mcp.NewTool(s.toolName("gws", "drive", "read_file"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithDescription("Read the content of a file from Google Drive"),
+			mcp.WithDescription("Read a Google Drive file's content and metadata. "+
+				"Google Docs export as plain text, Sheets as CSV, and Slides as "+
+				"text; other file types return their text content up to a 5MB "+
+				"limit (larger or binary files return metadata only). Returns the "+
+				"file name, MIME type, and size alongside the content. "+services.UntrustedContentNote),
 			mcp.WithString("fileId", mcp.Required(), mcp.Description("File ID")),
 			accountParam,
 		),
@@ -711,7 +724,10 @@ func (s *Server) registerDriveTools() {
 		mcp.NewTool(s.toolName("gws", "drive", "list_folder"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithDescription("List files in a Drive folder"),
+			mcp.WithDescription("List the files and subfolders directly inside a "+
+				"Drive folder (non-recursive). Returns each item's file ID, name, "+
+				"MIME type, modified time, and size. Omit folderId to list the "+
+				"account's Drive root."),
 			mcp.WithString("folderId", mcp.Description("Folder ID (default: root)")),
 			mcp.WithNumber("maxResults", mcp.Description("Maximum files to return (default: 50)")),
 			accountParam,
@@ -762,7 +778,8 @@ func (s *Server) registerSheetsTools() {
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Create a new Google Spreadsheet. Optionally seeds "+
 				"the first tab starting at A1 with initial_values (same JSON "+
-				"array-of-arrays shape as write_range). "+services.WriteToolWarning),
+				"array-of-arrays shape as write_range). Returns the new "+
+				"spreadsheet's ID and URL. "+services.CreateToolNote),
 			mcp.WithString("title", mcp.Required(), mcp.Description("Spreadsheet title")),
 			mcp.WithArray("initial_values", mcp.Description("Optional initial cell grid to seed starting at A1")),
 			accountParam,
@@ -834,7 +851,8 @@ func (s *Server) registerDocsTools() {
 		mcp.NewTool(s.toolName("gws", "docs", "create"),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Create a new Google Doc. Optionally inserts "+
-				"initial_text at the start of the body. "+services.WriteToolWarning),
+				"initial_text at the start of the body. Returns the new "+
+				"document's ID and URL. "+services.CreateToolNote),
 			mcp.WithString("title", mcp.Required(), mcp.Description("Document title")),
 			mcp.WithString("initial_text", mcp.Description("Optional plain text to insert at the start of the body")),
 			accountParam,
