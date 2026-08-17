@@ -104,3 +104,76 @@ func TestExtractBody_NoParts(t *testing.T) {
 		t.Errorf("expected empty, got %q", got)
 	}
 }
+
+func TestCollectAttachments(t *testing.T) {
+	payload := &gmail.MessagePart{
+		MimeType: "multipart/mixed",
+		Parts: []*gmail.MessagePart{
+			// Inline body — no filename/attachmentId, must be skipped.
+			{MimeType: "text/plain", Body: &gmail.MessagePartBody{Data: "aGk="}},
+			{
+				MimeType: "application/pdf",
+				Filename: "report.pdf",
+				Body:     &gmail.MessagePartBody{AttachmentId: "att-1", Size: 1234},
+			},
+			// Nested attachment inside a sub-part.
+			{
+				MimeType: "multipart/related",
+				Parts: []*gmail.MessagePart{
+					{
+						MimeType: "image/png",
+						Filename: "logo.png",
+						Body:     &gmail.MessagePartBody{AttachmentId: "att-2", Size: 42},
+					},
+				},
+			},
+		},
+	}
+
+	atts := collectAttachments(payload)
+	if len(atts) != 2 {
+		t.Fatalf("expected 2 attachments, got %d: %+v", len(atts), atts)
+	}
+	if atts[0].Filename != "report.pdf" || atts[0].AttachmentId != "att-1" || atts[0].Size != 1234 {
+		t.Errorf("first attachment mismatch: %+v", atts[0])
+	}
+	if atts[1].Filename != "logo.png" || atts[1].AttachmentId != "att-2" || atts[1].MimeType != "image/png" {
+		t.Errorf("nested attachment mismatch: %+v", atts[1])
+	}
+}
+
+func TestCollectAttachments_NoneWhenBodyOnly(t *testing.T) {
+	payload := &gmail.MessagePart{
+		MimeType: "text/plain",
+		Body:     &gmail.MessagePartBody{Data: "aGk="},
+	}
+	if atts := collectAttachments(payload); len(atts) != 0 {
+		t.Errorf("expected no attachments, got %+v", atts)
+	}
+}
+
+func TestHasForwardPrefix(t *testing.T) {
+	cases := map[string]bool{
+		"Fwd: Hello":  true,
+		"fwd: hello":  true,
+		"FW: hello":   true,
+		"  Fwd: hi":   true,
+		"Re: hello":   false,
+		"Hello world": false,
+		"":            false,
+	}
+	for in, want := range cases {
+		if got := hasForwardPrefix(in); got != want {
+			t.Errorf("hasForwardPrefix(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
+
+func TestOrDash(t *testing.T) {
+	if orDash("") != "-" {
+		t.Errorf("orDash(\"\") should be '-'")
+	}
+	if orDash("x") != "x" {
+		t.Errorf("orDash(\"x\") should be 'x'")
+	}
+}

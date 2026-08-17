@@ -19,6 +19,7 @@ func TestScopesContainsSheetsAndDocs(t *testing.T) {
 		ScopeDocs,
 		ScopeContacts,
 		ScopeDirectory,
+		ScopePresentations,
 		"https://www.googleapis.com/auth/userinfo.email",
 		"https://www.googleapis.com/auth/userinfo.profile",
 	}
@@ -35,6 +36,18 @@ func TestScopeSheetsAndDocsConstantsMatchEntry(t *testing.T) {
 	}
 	if ScopeDocs != "https://www.googleapis.com/auth/documents" {
 		t.Errorf("ScopeDocs constant drifted: %s", ScopeDocs)
+	}
+	if ScopePresentations != "https://www.googleapis.com/auth/presentations" {
+		t.Errorf("ScopePresentations constant drifted: %s", ScopePresentations)
+	}
+}
+
+// TestScopePresentationsAppendedLast guards the migration contract: the Slides
+// scope must be the LAST entry so the consent-screen ordering for pre-existing
+// scopes stays stable across the upgrade.
+func TestScopePresentationsAppendedLast(t *testing.T) {
+	if len(Scopes) == 0 || Scopes[len(Scopes)-1] != ScopePresentations {
+		t.Errorf("ScopePresentations must be the last scope entry; got %v", Scopes)
 	}
 }
 

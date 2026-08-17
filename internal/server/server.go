@@ -75,6 +75,7 @@ type Server struct {
 	docsSvc       *services.DocsService
 	contactsSvc   *services.ContactsService
 	taskSvc       *services.TasksService
+	slidesSvc     *services.SlidesService
 
 	pendingMu sync.Mutex
 	pending   map[string]*pendingSession
@@ -100,6 +101,7 @@ func New(cfg Config) *Server {
 		docsSvc:       services.NewDocsService(router, clientFactory),
 		contactsSvc:   services.NewContactsService(router, clientFactory),
 		taskSvc:       services.NewTasksService(router, clientFactory),
+		slidesSvc:     services.NewSlidesService(router, clientFactory),
 		pending:       make(map[string]*pendingSession),
 	}
 
@@ -225,6 +227,9 @@ func (s *Server) registerTools() {
 
 	// Tasks tools
 	s.registerTasksTools()
+
+	// Slides tools
+	s.registerSlidesTools()
 }
 
 // Serve starts the MCP server on stdio.
@@ -588,6 +593,42 @@ func (s *Server) registerMailTools() {
 			accountParam,
 		),
 		s.mailSvc.SendDraft,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "mail", "forward"),
+			// Additive: builds a DRAFT, never sends and never modifies the
+			// original message. NewTool defaults destructiveHint to true, so
+			// it must be set false explicitly.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Build a forward DRAFT of an existing message (does NOT send). "+
+				"The draft carries the original message's headers and body in the standard "+
+				"forwarded-message block, optionally prepended with a note. Returns the draft "+
+				"ID — send it with mail.send_draft. Attachments are listed by filename in the "+
+				"quoted block but not re-attached; use mail.get_attachment to pull their bytes."),
+			mcp.WithString("messageId", mcp.Required(), mcp.Description("The message ID to forward")),
+			mcp.WithString("to", mcp.Required(), mcp.Description("Recipient email(s), comma-separated")),
+			mcp.WithString("cc", mcp.Description("CC recipients, comma-separated")),
+			mcp.WithString("bcc", mcp.Description("BCC recipients, comma-separated")),
+			mcp.WithString("comment", mcp.Description("Optional note prepended above the forwarded content")),
+			accountParam,
+		),
+		s.mailSvc.Forward,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "mail", "get_attachment"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Fetch a single attachment's bytes from a message. The attachmentId "+
+				"comes from mail.read_message / mail.read_thread, which list each attachment's "+
+				"filename and attachmentId. Returns the filename, MIME type, size, and the "+
+				"attachment bytes base64-encoded in the JSON payload (data_base64). "+services.UntrustedContentNote),
+			mcp.WithString("messageId", mcp.Required(), mcp.Description("The message ID the attachment belongs to")),
+			mcp.WithString("attachmentId", mcp.Required(), mcp.Description("The attachment ID (from read_message/read_thread)")),
+			accountParam,
+		),
+		s.mailSvc.GetAttachment,
 	)
 
 	s.mcpServer.AddTool(
@@ -1088,6 +1129,53 @@ func (s *Server) registerTasksTools() {
 			accountParam,
 		),
 		s.taskSvc.Delete,
+	)
+}
+
+func (s *Server) registerSlidesTools() {
+	accountParam := mcp.WithString("account", mcp.Description("Account label or email. Uses default if omitted."))
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "slides", "get"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Read a Google Slides presentation: the slide count plus a "+
+				"per-slide plain-text summary (text boxes, shapes, and table cells). The raw "+
+				"slides structural tree is included in the JSON payload for callers that need "+
+				"it. "+services.UntrustedContentNote),
+			mcp.WithString("presentation_id", mcp.Required(), mcp.Description("The presentation ID from the URL")),
+			accountParam,
+		),
+		s.slidesSvc.Get,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "slides", "create"),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Create a new Google Slides presentation with the given title. "+
+				"Returns the new presentation's ID and URL. Add slides and content with "+
+				"slides.batch_update. "+services.CreateToolNote),
+			mcp.WithString("title", mcp.Required(), mcp.Description("Presentation title")),
+			accountParam,
+		),
+		s.slidesSvc.Create,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "slides", "batch_update"),
+			// Modifies existing presentation content (create/insert/delete
+			// slides and elements). Genuinely destructive.
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithDescription("Apply a batch of raw Slides API requests to an existing "+
+				"presentation. requests is a JSON array of Slides API Request objects (e.g. "+
+				"createSlide, insertText, deleteObject, replaceAllText) exactly as documented "+
+				"in the Slides API reference. This is the general-purpose editing primitive; "+
+				"the caller constructs valid request objects. "+services.WriteToolWarning),
+			mcp.WithString("presentation_id", mcp.Required(), mcp.Description("The presentation ID")),
+			mcp.WithArray("requests", mcp.Required(), mcp.Description("JSON array of Slides API request objects (e.g. [{\"createSlide\": {...}}, {\"insertText\": {...}}])")),
+			accountParam,
+		),
+		s.slidesSvc.BatchUpdate,
 	)
 }
 
