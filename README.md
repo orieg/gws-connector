@@ -19,7 +19,7 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Smart routing** — target accounts by label (`work`), email, or domain
 - **Per-account OAuth** — different orgs can use their own GCP credentials
 - **Secure storage** — client secrets and tokens stored in OS keychain (file fallback on Linux without GNOME Keyring)
-- **33 tools** — Mail (9), Calendar (7), Drive (3), Sheets (4), Docs (4), account management (6)
+- **35 tools** — Mail (9), Calendar (7), Drive (3), Sheets (6), Docs (4), account management (6)
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
 
@@ -232,6 +232,8 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.drive.list_folder` | List folder contents |
 | `gws.sheets.read_range` | Read a single A1 range from a spreadsheet |
 | `gws.sheets.write_range` | Write cell values to a range |
+| `gws.sheets.append` | Append rows after a table (additive, never overwrites) |
+| `gws.sheets.clear` | Clear values in a range (formatting left intact) |
 | `gws.sheets.create` | Create a new spreadsheet |
 | `gws.sheets.list_tabs` | List tabs (sheets) in a spreadsheet |
 | `gws.docs.read` | Read a document as plain text |

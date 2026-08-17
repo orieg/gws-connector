@@ -256,6 +256,8 @@ func TestAllToolsRegistered(t *testing.T) {
 		// Sheets
 		"gws.sheets.read_range",
 		"gws.sheets.write_range",
+		"gws.sheets.append",
+		"gws.sheets.clear",
 		"gws.sheets.create",
 		"gws.sheets.list_tabs",
 		// Docs
@@ -350,6 +352,44 @@ func TestCalendarWriteToolAnnotations(t *testing.T) {
 		}
 	} else {
 		t.Error("gws.cal.free_busy not registered")
+	}
+}
+
+// Guards the same mark3labs/mcp-go gotcha for Sheets write tools: append is
+// additive (adds rows, never overwrites) so destructiveHint must be false,
+// while clear empties cells and must keep destructiveHint true.
+func TestSheetsWriteToolAnnotations(t *testing.T) {
+	s := testServer(t)
+	tools := s.mcpServer.ListTools()
+
+	boolVal := func(p *bool) string {
+		if p == nil {
+			return "unset"
+		}
+		if *p {
+			return "true"
+		}
+		return "false"
+	}
+
+	// append: additive — destructiveHint must be explicitly false.
+	if tool, ok := tools["gws.sheets.append"]; ok {
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("append destructiveHint should be false, got %s", boolVal(a.DestructiveHint))
+		}
+	} else {
+		t.Error("gws.sheets.append not registered")
+	}
+
+	// clear: destructive — empties cell values.
+	if tool, ok := tools["gws.sheets.clear"]; ok {
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != true {
+			t.Errorf("clear destructiveHint should be true, got %s", boolVal(a.DestructiveHint))
+		}
+	} else {
+		t.Error("gws.sheets.clear not registered")
 	}
 }
 

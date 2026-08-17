@@ -243,6 +243,118 @@ func (s *SheetsService) WriteRange(ctx context.Context, req mcp.CallToolRequest)
 	return TextAndJSONResult(summary, payload), nil
 }
 
+// Append adds rows after the last row of the table that overlaps the given
+// range. It never overwrites existing cells: with InsertDataOption
+// INSERT_ROWS, new rows are inserted below the detected table so surrounding
+// data is preserved. values has the same JSON array-of-arrays shape as
+// WriteRange.
+func (s *SheetsService) Append(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	svc, acct, err := s.resolveAndGetService(ctx, req.GetArguments())
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	spreadsheetID, _ := req.GetArguments()["spreadsheet_id"].(string)
+	if spreadsheetID == "" {
+		return ErrorResult(fmt.Errorf("spreadsheet_id is required")), nil
+	}
+	rangeA1, _ := req.GetArguments()["range"].(string)
+	if err := validateA1Range(rangeA1); err != nil {
+		return ErrorResult(err), nil
+	}
+
+	rawValues, ok := req.GetArguments()["values"]
+	if !ok || rawValues == nil {
+		return ErrorResult(fmt.Errorf(
+			"values is required as a JSON array of arrays " +
+				"(example: [[\"A1\",\"B1\"],[\"A2\",\"B2\"]])")), nil
+	}
+	grid, err := coerceCellGrid(rawValues)
+	if err != nil {
+		return ErrorResult(fmt.Errorf("values: %w", err)), nil
+	}
+
+	inputOpt := "USER_ENTERED"
+	if v, ok := req.GetArguments()["value_input_option"].(string); ok && v != "" {
+		switch strings.ToUpper(v) {
+		case "RAW", "USER_ENTERED":
+			inputOpt = strings.ToUpper(v)
+		default:
+			return ErrorResult(fmt.Errorf(
+				"value_input_option must be 'RAW' or 'USER_ENTERED', got %q", v)), nil
+		}
+	}
+
+	body := &sheets.ValueRange{Values: grid}
+
+	resp, err := svc.Spreadsheets.Values.Append(spreadsheetID, rangeA1, body).
+		ValueInputOption(inputOpt).
+		InsertDataOption("INSERT_ROWS").Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Sheets", err, "appending rows on %s: %w", acct.Label, err)), nil
+	}
+
+	// The Append response nests the write result under Updates.
+	var updatedRange string
+	var updatedRows, updatedCells, updatedColumns int64
+	if resp.Updates != nil {
+		updatedRange = resp.Updates.UpdatedRange
+		updatedRows = resp.Updates.UpdatedRows
+		updatedCells = resp.Updates.UpdatedCells
+		updatedColumns = resp.Updates.UpdatedColumns
+	}
+
+	summary := fmt.Sprintf(
+		"Appended %d row(s) (%d cell(s)) at %s on %s (%s).",
+		updatedRows, updatedCells, updatedRange, acct.Label, acct.Email)
+
+	payload := map[string]any{
+		"spreadsheet_id":     spreadsheetID,
+		"requested_range":    rangeA1,
+		"updated_range":      updatedRange,
+		"updated_rows":       updatedRows,
+		"updated_cells":      updatedCells,
+		"updated_columns":    updatedColumns,
+		"value_input_option": inputOpt,
+	}
+	return TextAndJSONResult(summary, payload), nil
+}
+
+// Clear empties the values in an A1 range. It removes cell values only —
+// formatting, data validation, and other cell properties are left intact, and
+// no rows or columns are deleted.
+func (s *SheetsService) Clear(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	svc, acct, err := s.resolveAndGetService(ctx, req.GetArguments())
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	spreadsheetID, _ := req.GetArguments()["spreadsheet_id"].(string)
+	if spreadsheetID == "" {
+		return ErrorResult(fmt.Errorf("spreadsheet_id is required")), nil
+	}
+	rangeA1, _ := req.GetArguments()["range"].(string)
+	if err := validateA1Range(rangeA1); err != nil {
+		return ErrorResult(err), nil
+	}
+
+	resp, err := svc.Spreadsheets.Values.Clear(spreadsheetID, rangeA1, &sheets.ClearValuesRequest{}).Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Sheets", err, "clearing range on %s: %w", acct.Label, err)), nil
+	}
+
+	summary := fmt.Sprintf(
+		"Cleared values in %s on %s (%s). Formatting was left intact.",
+		resp.ClearedRange, acct.Label, acct.Email)
+
+	payload := map[string]any{
+		"spreadsheet_id":  spreadsheetID,
+		"requested_range": rangeA1,
+		"cleared_range":   resp.ClearedRange,
+	}
+	return TextAndJSONResult(summary, payload), nil
+}
+
 // Create creates a new spreadsheet. Optionally seeds Sheet1 with
 // initial_values (same JSON array-of-arrays shape as WriteRange).
 func (s *SheetsService) Create(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

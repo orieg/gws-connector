@@ -831,6 +831,48 @@ func (s *Server) registerSheetsTools() {
 	)
 
 	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "sheets", "append"),
+			// Additive: appends new rows after the given table and never
+			// overwrites existing cells. NewTool defaults destructiveHint to
+			// true, so it must be set false explicitly.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Append rows to a Google Spreadsheet after the "+
+				"table that overlaps range, without computing the next empty row "+
+				"yourself. range is the table/range to append after (A1 notation, "+
+				"e.g. 'Sheet1!A1:C1' or 'Sheet1'). values is a JSON array of arrays "+
+				"of scalars (strings/numbers/bools/null); each inner array is one new "+
+				"row. Uses InsertDataOption INSERT_ROWS, so new rows are inserted "+
+				"below the detected table and existing data is preserved (additive, "+
+				"never overwrites). value_input_option defaults to 'USER_ENTERED' "+
+				"(formulas and dates are parsed); pass 'RAW' to append values "+
+				"verbatim. Returns the updated range plus the appended row and cell "+
+				"counts."),
+			mcp.WithString("spreadsheet_id", mcp.Required(), mcp.Description("The spreadsheet ID")),
+			mcp.WithString("range", mcp.Required(), mcp.Description("A1-notation table/range to append after (e.g., 'Sheet1!A1:C1' or 'Sheet1')")),
+			mcp.WithArray("values", mcp.Required(), mcp.Description("2D array of cell values (array of row arrays); each row is appended")),
+			mcp.WithString("value_input_option", mcp.Description("'RAW' or 'USER_ENTERED' (default)")),
+			accountParam,
+		),
+		s.sheetsSvc.Append,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "sheets", "clear"),
+			// Destructive: empties existing cell values in the given range.
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithDescription("Clear (empty) the values in a range of a Google "+
+				"Spreadsheet. range uses A1 notation (e.g., 'Sheet1!A1:C10', "+
+				"'Sheet1'). Removes cell values only — formatting, data validation, "+
+				"and other cell properties are left intact, and no rows or columns "+
+				"are deleted. Returns the cleared range. "+services.WriteToolWarning),
+			mcp.WithString("spreadsheet_id", mcp.Required(), mcp.Description("The spreadsheet ID")),
+			mcp.WithString("range", mcp.Required(), mcp.Description("A1-notation range to clear (e.g., 'Sheet1!A1:C10')")),
+			accountParam,
+		),
+		s.sheetsSvc.Clear,
+	)
+
+	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "sheets", "create"),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithDescription("Create a new Google Spreadsheet. Optionally seeds "+
