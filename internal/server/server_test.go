@@ -263,6 +263,12 @@ func TestAllToolsRegistered(t *testing.T) {
 		"gws.docs.insert_text",
 		"gws.docs.replace_text",
 		"gws.docs.create",
+		// Tasks
+		"gws.tasks.list_tasklists",
+		"gws.tasks.list",
+		"gws.tasks.create",
+		"gws.tasks.complete",
+		"gws.tasks.delete",
 	}
 
 	for _, name := range expected {
@@ -350,6 +356,62 @@ func TestCalendarWriteToolAnnotations(t *testing.T) {
 		}
 	} else {
 		t.Error("gws.cal.free_busy not registered")
+	}
+}
+
+// Guards the same mark3labs/mcp-go gotcha for Tasks tools: list_tasklists and
+// list are read-only; create and complete are reversible/additive modifies
+// (destructiveHint must be explicitly false); delete is genuinely destructive.
+func TestTasksToolAnnotations(t *testing.T) {
+	s := testServer(t)
+	tools := s.mcpServer.ListTools()
+
+	boolVal := func(p *bool) string {
+		if p == nil {
+			return "unset"
+		}
+		if *p {
+			return "true"
+		}
+		return "false"
+	}
+
+	readOnly := []string{"gws.tasks.list_tasklists", "gws.tasks.list"}
+	for _, name := range readOnly {
+		tool, ok := tools[name]
+		if !ok {
+			t.Errorf("%s not registered", name)
+			continue
+		}
+		a := tool.Tool.Annotations
+		if a.ReadOnlyHint == nil || *a.ReadOnlyHint != true {
+			t.Errorf("%s readOnlyHint should be true, got %s", name, boolVal(a.ReadOnlyHint))
+		}
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("%s destructiveHint should be false, got %s", name, boolVal(a.DestructiveHint))
+		}
+	}
+
+	nonDestructive := []string{"gws.tasks.create", "gws.tasks.complete"}
+	for _, name := range nonDestructive {
+		tool, ok := tools[name]
+		if !ok {
+			t.Errorf("%s not registered", name)
+			continue
+		}
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("%s destructiveHint should be false, got %s", name, boolVal(a.DestructiveHint))
+		}
+	}
+
+	if tool, ok := tools["gws.tasks.delete"]; ok {
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != true {
+			t.Errorf("delete destructiveHint should be true, got %s", boolVal(a.DestructiveHint))
+		}
+	} else {
+		t.Error("gws.tasks.delete not registered")
 	}
 }
 

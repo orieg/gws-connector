@@ -35,6 +35,7 @@ var Scopes = []string{
 	"https://www.googleapis.com/auth/documents",
 	"https://www.googleapis.com/auth/userinfo.email",
 	"https://www.googleapis.com/auth/userinfo.profile",
+	"https://www.googleapis.com/auth/tasks",
 }
 
 // ScopeSheets is the Google Sheets API full-access scope.
@@ -42,6 +43,9 @@ const ScopeSheets = "https://www.googleapis.com/auth/spreadsheets"
 
 // ScopeDocs is the Google Docs API full-access scope.
 const ScopeDocs = "https://www.googleapis.com/auth/documents"
+
+// ScopeTasks is the Google Tasks API full-access scope.
+const ScopeTasks = "https://www.googleapis.com/auth/tasks"
 
 // UserInfo holds the authenticated user's profile.
 type UserInfo struct {

@@ -73,6 +73,7 @@ type Server struct {
 	driveSvc      *services.DriveService
 	sheetsSvc     *services.SheetsService
 	docsSvc       *services.DocsService
+	taskSvc       *services.TasksService
 
 	pendingMu sync.Mutex
 	pending   map[string]*pendingSession
@@ -96,6 +97,7 @@ func New(cfg Config) *Server {
 		driveSvc:      services.NewDriveService(router, clientFactory),
 		sheetsSvc:     services.NewSheetsService(router, clientFactory),
 		docsSvc:       services.NewDocsService(router, clientFactory),
+		taskSvc:       services.NewTasksService(router, clientFactory),
 		pending:       make(map[string]*pendingSession),
 	}
 
@@ -215,6 +217,9 @@ func (s *Server) registerTools() {
 
 	// Docs tools
 	s.registerDocsTools()
+
+	// Tasks tools
+	s.registerTasksTools()
 }
 
 // Serve starts the MCP server on stdio.
@@ -915,6 +920,90 @@ func (s *Server) registerDocsTools() {
 			accountParam,
 		),
 		s.docsSvc.Create,
+	)
+}
+
+func (s *Server) registerTasksTools() {
+	accountParam := mcp.WithString("account", mcp.Description("Account label or email. Uses default if omitted."))
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "list_tasklists"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("List the account's Google Tasks task lists. Returns "+
+				"each list's title and ID. Use a returned list ID as the 'tasklist' "+
+				"argument to the other tasks tools; omit 'tasklist' there to target "+
+				"the account's default list ('@default')."),
+			accountParam,
+		),
+		s.taskSvc.ListTasklists,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "list"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("List the tasks in a task list. Returns each task's "+
+				"title, status (needsAction/completed), due date, notes, and ID. "+
+				"tasklist defaults to the account's default list ('@default'). By "+
+				"default only active tasks are returned; set showCompleted=true to "+
+				"include completed ones."),
+			mcp.WithString("tasklist", mcp.Description("Task list ID (default: '@default')")),
+			mcp.WithBoolean("showCompleted", mcp.Description("Include completed tasks (default: false)")),
+			accountParam,
+		),
+		s.taskSvc.ListTasks,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "create"),
+			// Additive: inserts a new task, never removes or overwrites existing
+			// data. NewTool defaults destructiveHint to true, so set it false.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Create a new task in a task list. title is required. "+
+				"due is an RFC3339 timestamp (only the date portion is stored by "+
+				"Google Tasks — the time is discarded). tasklist defaults to the "+
+				"account's default list ('@default'). Returns the new task's title, "+
+				"due date, and ID."),
+			mcp.WithString("title", mcp.Required(), mcp.Description("Task title")),
+			mcp.WithString("notes", mcp.Description("Free-text notes/description for the task")),
+			mcp.WithString("due", mcp.Description("Due date (RFC3339, e.g. 2026-08-20T00:00:00Z; only the date is stored)")),
+			mcp.WithString("tasklist", mcp.Description("Task list ID (default: '@default')")),
+			accountParam,
+		),
+		s.taskSvc.Create,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "complete"),
+			// Reversible modify: sets status to completed; the task still exists
+			// and can be reopened. NewTool defaults destructiveHint to true.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Mark a task as completed (sets its status to "+
+				"'completed'). This is reversible — the task is not deleted. "+
+				"tasklist defaults to the account's default list ('@default'). "+
+				"Returns the task's title, new status, and ID."),
+			mcp.WithString("taskId", mcp.Required(), mcp.Description("Task ID to complete")),
+			mcp.WithString("tasklist", mcp.Description("Task list ID (default: '@default')")),
+			accountParam,
+		),
+		s.taskSvc.Complete,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "tasks", "delete"),
+			// Genuinely destructive: permanently removes the task.
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithDescription("Permanently delete a task from a task list. This "+
+				"cannot be undone — confirm with the user before calling. To mark a "+
+				"task done without removing it, use tasks.complete instead. tasklist "+
+				"defaults to the account's default list ('@default'). Returns the "+
+				"deleted task's ID and list."),
+			mcp.WithString("taskId", mcp.Required(), mcp.Description("Task ID to delete")),
+			mcp.WithString("tasklist", mcp.Description("Task list ID (default: '@default')")),
+			accountParam,
+		),
+		s.taskSvc.Delete,
 	)
 }
 
