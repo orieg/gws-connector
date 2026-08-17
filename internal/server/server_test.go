@@ -237,6 +237,8 @@ func TestAllToolsRegistered(t *testing.T) {
 		"gws.mail.read_thread",
 		"gws.mail.create_draft",
 		"gws.mail.send_draft",
+		"gws.mail.forward",
+		"gws.mail.get_attachment",
 		"gws.mail.list_labels",
 		"gws.mail.create_label",
 		"gws.mail.modify_message",
@@ -263,6 +265,10 @@ func TestAllToolsRegistered(t *testing.T) {
 		"gws.docs.insert_text",
 		"gws.docs.replace_text",
 		"gws.docs.create",
+		// Slides
+		"gws.slides.get",
+		"gws.slides.create",
+		"gws.slides.batch_update",
 	}
 
 	for _, name := range expected {
@@ -350,6 +356,96 @@ func TestCalendarWriteToolAnnotations(t *testing.T) {
 		}
 	} else {
 		t.Error("gws.cal.free_busy not registered")
+	}
+}
+
+// Guards the mark3labs/mcp-go gotcha for the new Gmail tools: forward builds
+// a draft and never sends (additive → destructiveHint false); get_attachment
+// is read-only; and both must set the hints explicitly since NewTool defaults
+// destructiveHint to true.
+func TestMailForwardAttachmentAnnotations(t *testing.T) {
+	s := testServer(t)
+	tools := s.mcpServer.ListTools()
+
+	boolVal := func(p *bool) string {
+		if p == nil {
+			return "unset"
+		}
+		if *p {
+			return "true"
+		}
+		return "false"
+	}
+
+	// forward: additive draft — destructiveHint must be explicitly false.
+	if tool, ok := tools["gws.mail.forward"]; ok {
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("forward destructiveHint should be false, got %s", boolVal(a.DestructiveHint))
+		}
+	} else {
+		t.Error("gws.mail.forward not registered")
+	}
+
+	// get_attachment: read-only.
+	if tool, ok := tools["gws.mail.get_attachment"]; ok {
+		a := tool.Tool.Annotations
+		if a.ReadOnlyHint == nil || *a.ReadOnlyHint != true {
+			t.Errorf("get_attachment readOnlyHint should be true, got %s", boolVal(a.ReadOnlyHint))
+		}
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("get_attachment destructiveHint should be false, got %s", boolVal(a.DestructiveHint))
+		}
+	} else {
+		t.Error("gws.mail.get_attachment not registered")
+	}
+}
+
+// Guards the same gotcha for Slides: get is read-only, create is additive
+// (destructiveHint false), and batch_update modifies existing content
+// (destructiveHint true).
+func TestSlidesToolAnnotations(t *testing.T) {
+	s := testServer(t)
+	tools := s.mcpServer.ListTools()
+
+	boolVal := func(p *bool) string {
+		if p == nil {
+			return "unset"
+		}
+		if *p {
+			return "true"
+		}
+		return "false"
+	}
+
+	if tool, ok := tools["gws.slides.get"]; ok {
+		a := tool.Tool.Annotations
+		if a.ReadOnlyHint == nil || *a.ReadOnlyHint != true {
+			t.Errorf("slides.get readOnlyHint should be true, got %s", boolVal(a.ReadOnlyHint))
+		}
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("slides.get destructiveHint should be false, got %s", boolVal(a.DestructiveHint))
+		}
+	} else {
+		t.Error("gws.slides.get not registered")
+	}
+
+	if tool, ok := tools["gws.slides.create"]; ok {
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("slides.create destructiveHint should be false, got %s", boolVal(a.DestructiveHint))
+		}
+	} else {
+		t.Error("gws.slides.create not registered")
+	}
+
+	if tool, ok := tools["gws.slides.batch_update"]; ok {
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != true {
+			t.Errorf("slides.batch_update destructiveHint should be true, got %s", boolVal(a.DestructiveHint))
+		}
+	} else {
+		t.Error("gws.slides.batch_update not registered")
 	}
 }
 

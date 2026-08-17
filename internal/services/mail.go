@@ -236,6 +236,179 @@ func (m *MailService) SendDraft(ctx context.Context, req mcp.CallToolRequest) (*
 	)), nil
 }
 
+// Forward builds a forward DRAFT of an existing message (it does not send).
+// The draft carries the original message's headers and body in the standard
+// "---------- Forwarded message ---------" quoted block, optionally prepended
+// with a note. The caller sends it with mail.send_draft.
+//
+// Attachments on the original message are listed by filename in the quoted
+// block (so the recipient knows what was there) but the binary data is NOT
+// re-attached — Gmail's forward re-encoding of arbitrary MIME attachments is
+// a much larger surface. Use mail.get_attachment to pull an attachment's
+// bytes if you need to act on it.
+func (m *MailService) Forward(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	svc, acct, err := m.resolveAndGetService(ctx, req.GetArguments())
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	messageId, _ := req.GetArguments()["messageId"].(string)
+	if messageId == "" {
+		return ErrorResult(fmt.Errorf("messageId is required")), nil
+	}
+	to, _ := req.GetArguments()["to"].(string)
+	if to == "" {
+		return ErrorResult(fmt.Errorf("to is required")), nil
+	}
+	cc, _ := req.GetArguments()["cc"].(string)
+	bcc, _ := req.GetArguments()["bcc"].(string)
+	comment, _ := req.GetArguments()["comment"].(string)
+
+	orig, err := svc.Users.Messages.Get("me", messageId).Format("full").Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "reading message to forward on %s: %w", acct.Label, err)), nil
+	}
+
+	origFrom, origTo, origSubject, origDate := "", "", "", ""
+	for _, h := range orig.Payload.Headers {
+		switch h.Name {
+		case "From":
+			origFrom = h.Value
+		case "To":
+			origTo = h.Value
+		case "Subject":
+			origSubject = h.Value
+		case "Date":
+			origDate = h.Value
+		}
+	}
+
+	subject := origSubject
+	if !hasForwardPrefix(subject) {
+		subject = "Fwd: " + subject
+	}
+
+	// Build the forwarded body (plain text).
+	var body strings.Builder
+	if comment != "" {
+		body.WriteString(comment)
+		body.WriteString("\n\n")
+	}
+	body.WriteString("---------- Forwarded message ---------\n")
+	body.WriteString(fmt.Sprintf("From: %s\n", origFrom))
+	body.WriteString(fmt.Sprintf("Date: %s\n", origDate))
+	body.WriteString(fmt.Sprintf("Subject: %s\n", origSubject))
+	body.WriteString(fmt.Sprintf("To: %s\n", origTo))
+	if atts := collectAttachments(orig.Payload); len(atts) > 0 {
+		body.WriteString("Attachments (not re-attached — use mail.get_attachment):\n")
+		for _, a := range atts {
+			body.WriteString(fmt.Sprintf("  - %s (%s, %d bytes, attachmentId: %s)\n", a.Filename, a.MimeType, a.Size, a.AttachmentId))
+		}
+	}
+	body.WriteString("\n")
+	if orig := extractBody(orig.Payload); orig != "" {
+		body.WriteString(orig)
+	} else {
+		body.WriteString("[No text content in original message]")
+	}
+
+	// Build RFC 2822 message (mirrors CreateDraft).
+	var rawMsg strings.Builder
+	rawMsg.WriteString("MIME-Version: 1.0\r\n")
+	rawMsg.WriteString(fmt.Sprintf("To: %s\r\n", to))
+	if cc != "" {
+		rawMsg.WriteString(fmt.Sprintf("Cc: %s\r\n", cc))
+	}
+	if bcc != "" {
+		rawMsg.WriteString(fmt.Sprintf("Bcc: %s\r\n", bcc))
+	}
+	rawMsg.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject)))
+	rawMsg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	rawMsg.WriteString("Content-Transfer-Encoding: base64\r\n")
+	rawMsg.WriteString("\r\n")
+	rawMsg.WriteString(base64.StdEncoding.EncodeToString([]byte(body.String())))
+
+	encoded := base64.URLEncoding.EncodeToString([]byte(rawMsg.String()))
+
+	draft := &gmail.Draft{
+		Message: &gmail.Message{
+			Raw:      encoded,
+			ThreadId: orig.ThreadId,
+		},
+	}
+
+	created, err := svc.Users.Drafts.Create("me", draft).Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "creating forward draft on %s: %w", acct.Label, err)), nil
+	}
+
+	return TextResult(fmt.Sprintf(
+		"Forward draft created on %s (%s).\nDraft ID: %s\nTo: %s\nSubject: %s\n\nThe email was NOT sent. Send it with mail.send_draft (draftId=%s).",
+		acct.Label, acct.Email, created.Id, to, subject, created.Id,
+	)), nil
+}
+
+// GetAttachment fetches a single attachment's bytes from a message. The raw
+// data is base64url internally (Gmail's encoding); the returned JSON payload
+// re-encodes it as standard base64 in "data_base64" alongside the filename,
+// MIME type, and size read from the message's part metadata.
+func (m *MailService) GetAttachment(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	svc, acct, err := m.resolveAndGetService(ctx, req.GetArguments())
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	messageId, _ := req.GetArguments()["messageId"].(string)
+	if messageId == "" {
+		return ErrorResult(fmt.Errorf("messageId is required")), nil
+	}
+	attachmentId, _ := req.GetArguments()["attachmentId"].(string)
+	if attachmentId == "" {
+		return ErrorResult(fmt.Errorf("attachmentId is required")), nil
+	}
+
+	// Read the message metadata to resolve the attachment's filename/mimeType.
+	filename, mimeType := "", ""
+	if msg, err := svc.Users.Messages.Get("me", messageId).Format("full").Do(); err == nil {
+		for _, a := range collectAttachments(msg.Payload) {
+			if a.AttachmentId == attachmentId {
+				filename = a.Filename
+				mimeType = a.MimeType
+				break
+			}
+		}
+	}
+
+	att, err := svc.Users.Messages.Attachments.Get("me", messageId, attachmentId).Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Gmail", err, "getting attachment on %s: %w", acct.Label, err)), nil
+	}
+
+	decoded, err := base64.URLEncoding.DecodeString(att.Data)
+	if err != nil {
+		// Gmail may pad-strip; fall back to the raw-URL variant.
+		decoded, err = base64.RawURLEncoding.DecodeString(att.Data)
+		if err != nil {
+			return ErrorResult(fmt.Errorf("decoding attachment data on %s: %w", acct.Label, err)), nil
+		}
+	}
+
+	summary := fmt.Sprintf(
+		"Fetched attachment from message %s on %s (%s).\n  Filename: %s\n  MIME type: %s\n  Size: %d bytes\n\n%s",
+		messageId, acct.Label, acct.Email, orDash(filename), orDash(mimeType), len(decoded), UntrustedContentNote,
+	)
+
+	payload := map[string]any{
+		"message_id":    messageId,
+		"attachment_id": attachmentId,
+		"filename":      filename,
+		"mime_type":     mimeType,
+		"size":          len(decoded),
+		"data_base64":   base64.StdEncoding.EncodeToString(decoded),
+	}
+	return TextAndJSONResult(summary, payload), nil
+}
+
 // ListLabels lists Gmail labels.
 func (m *MailService) ListLabels(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	svc, acct, err := m.resolveAndGetService(ctx, req.GetArguments())
@@ -270,9 +443,9 @@ func (m *MailService) CreateLabel(ctx context.Context, req mcp.CallToolRequest) 
 	}
 
 	label := &gmail.Label{
-		Name:                    name,
-		LabelListVisibility:     "labelShow",
-		MessageListVisibility:   "show",
+		Name:                  name,
+		LabelListVisibility:   "labelShow",
+		MessageListVisibility: "show",
 	}
 
 	// Optional color
@@ -379,7 +552,16 @@ func formatMessage(msg *gmail.Message, acct *accounts.Account, raw bool) string 
 
 	sb.WriteString(fmt.Sprintf("Account: %s (%s)\n", acct.Label, acct.Email))
 	sb.WriteString(fmt.Sprintf("From: %s\nTo: %s\nSubject: %s\nDate: %s\n", from, to, subject, date))
-	sb.WriteString(fmt.Sprintf("ID: %s | Thread: %s\n\n", msg.Id, msg.ThreadId))
+	sb.WriteString(fmt.Sprintf("ID: %s | Thread: %s\n", msg.Id, msg.ThreadId))
+
+	// Surface attachments so agents know what to fetch with mail.get_attachment.
+	if atts := collectAttachments(msg.Payload); len(atts) > 0 {
+		sb.WriteString(fmt.Sprintf("Attachments (%d):\n", len(atts)))
+		for _, a := range atts {
+			sb.WriteString(fmt.Sprintf("  - %s (%s, %d bytes) attachmentId: %s\n", a.Filename, a.MimeType, a.Size, a.AttachmentId))
+		}
+	}
+	sb.WriteString("\n")
 
 	if raw {
 		body := extractRawBody(msg.Payload)
@@ -398,6 +580,55 @@ func formatMessage(msg *gmail.Message, acct *accounts.Account, raw bool) string 
 	}
 
 	return sb.String()
+}
+
+// mailAttachment describes one attachment part of a Gmail message.
+type mailAttachment struct {
+	Filename     string
+	MimeType     string
+	AttachmentId string
+	Size         int64
+}
+
+// collectAttachments walks the MIME tree and returns every part that is an
+// attachment (has a filename and an external attachment ID). Inline text
+// bodies (no filename, no attachmentId) are skipped.
+func collectAttachments(payload *gmail.MessagePart) []mailAttachment {
+	var out []mailAttachment
+	var walk func(part *gmail.MessagePart)
+	walk = func(part *gmail.MessagePart) {
+		if part == nil {
+			return
+		}
+		if part.Filename != "" && part.Body != nil && part.Body.AttachmentId != "" {
+			out = append(out, mailAttachment{
+				Filename:     part.Filename,
+				MimeType:     part.MimeType,
+				AttachmentId: part.Body.AttachmentId,
+				Size:         part.Body.Size,
+			})
+		}
+		for _, child := range part.Parts {
+			walk(child)
+		}
+	}
+	walk(payload)
+	return out
+}
+
+// hasForwardPrefix reports whether subject already carries a forward prefix,
+// so Forward doesn't stack "Fwd: Fwd:".
+func hasForwardPrefix(subject string) bool {
+	s := strings.ToLower(strings.TrimSpace(subject))
+	return strings.HasPrefix(s, "fwd:") || strings.HasPrefix(s, "fw:")
+}
+
+// orDash returns "-" for an empty string, so summaries never render a blank field.
+func orDash(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
 }
 
 // extractRawBody returns the original body without conversion — prefers HTML, falls back to plain text.

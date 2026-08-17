@@ -13,6 +13,7 @@ import (
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/option"
 	sheets "google.golang.org/api/sheets/v4"
+	slides "google.golang.org/api/slides/v1"
 )
 
 // AccountCredentials provides per-account OAuth client ID lookup.
@@ -24,10 +25,10 @@ type AccountCredentials interface {
 
 // ClientFactory creates authenticated Google API service clients for accounts.
 type ClientFactory struct {
-	tokenStore       *TokenStore
-	globalClientID   string
-	globalClientSec  string
-	accountCreds     AccountCredentials
+	tokenStore      *TokenStore
+	globalClientID  string
+	globalClientSec string
+	accountCreds    AccountCredentials
 }
 
 // NewClientFactory creates a new factory. accountCreds can be nil if no
@@ -142,6 +143,21 @@ func (f *ClientFactory) DocsService(ctx context.Context, email string) (*docs.Se
 		return nil, err
 	}
 	return docs.NewService(ctx, option.WithHTTPClient(client))
+}
+
+// SlidesService returns an authenticated Slides service for the account.
+// Same proactive-scope behavior as SheetsService/DocsService: a token that
+// pre-dates Slides support (issue #67) is caught here with a *ScopeError
+// before any API call, telling the agent to run gws.accounts.reauth.
+func (f *ClientFactory) SlidesService(ctx context.Context, email string) (*slides.Service, error) {
+	if err := f.ensureScope(email, ScopePresentations, "Slides"); err != nil {
+		return nil, err
+	}
+	client, err := f.httpClient(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return slides.NewService(ctx, option.WithHTTPClient(client))
 }
 
 // ensureScope loads the account's token and runs ValidateScopes against it.

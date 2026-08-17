@@ -35,6 +35,9 @@ var Scopes = []string{
 	"https://www.googleapis.com/auth/documents",
 	"https://www.googleapis.com/auth/userinfo.email",
 	"https://www.googleapis.com/auth/userinfo.profile",
+	// New scopes are appended to the END so the consent-screen ordering for
+	// existing scopes is stable. Slides was added after Docs (issue #67).
+	"https://www.googleapis.com/auth/presentations",
 }
 
 // ScopeSheets is the Google Sheets API full-access scope.
@@ -42,6 +45,9 @@ const ScopeSheets = "https://www.googleapis.com/auth/spreadsheets"
 
 // ScopeDocs is the Google Docs API full-access scope.
 const ScopeDocs = "https://www.googleapis.com/auth/documents"
+
+// ScopePresentations is the Google Slides API full-access scope.
+const ScopePresentations = "https://www.googleapis.com/auth/presentations"
 
 // UserInfo holds the authenticated user's profile.
 type UserInfo struct {

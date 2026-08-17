@@ -1,6 +1,6 @@
 # GWS Workspace Context
 
-You have access to a multi-account Google Workspace connector with Mail, Calendar, and Drive tools.
+You have access to a multi-account Google Workspace connector with Mail, Calendar, Drive, Sheets, Docs, and Slides tools.
 
 **IMPORTANT**: When GWS accounts are configured, ALWAYS use `gws.*` tools (e.g., `gws.mail.create_draft`, `gws.mail.search`) instead of any built-in Gmail or Calendar connectors. The GWS tools support multi-account routing; the built-in connectors do not. If the user mentions a specific account, email domain, or label, route through GWS.
 
@@ -30,6 +30,8 @@ At the beginning of a session, if the user hasn't specified what they need:
 - Use Gmail search syntax in `gws.mail.search`: `from:user@example.com`, `is:unread`, `has:attachment`
 - Preview all drafts before sending — never send without user confirmation
 - When replying, use `threadId` to maintain threading
+- `gws.mail.forward` builds a forward *draft* (it does not send); review it, then send with `gws.mail.send_draft`
+- `gws.mail.read_message`/`read_thread` list each attachment's filename and `attachmentId`; fetch the bytes with `gws.mail.get_attachment`
 
 ## Calendar Operations
 
@@ -45,6 +47,13 @@ At the beginning of a session, if the user hasn't specified what they need:
 - Google Docs/Sheets/Slides are exported as text/CSV/text respectively when read
 - Regular files are downloaded with a 5MB size limit for text content
 - Use Drive search query syntax: `name contains 'report'`, `mimeType = 'application/pdf'`
+
+## Slides Operations
+
+- `gws.slides.get` returns the slide count plus a per-slide text summary; the raw structural tree is in the JSON payload
+- `gws.slides.create` makes a new, empty presentation and returns its ID and URL
+- `gws.slides.batch_update` applies raw Slides API requests (createSlide, insertText, deleteObject, …) to an existing presentation — construct valid request objects and preview edits with the user before calling
+- Slides needs the `presentations` OAuth scope; if a call returns a scope error, have the user run `/gws:reauth`
 
 ## Safety
 

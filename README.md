@@ -19,7 +19,7 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Smart routing** — target accounts by label (`work`), email, or domain
 - **Per-account OAuth** — different orgs can use their own GCP credentials
 - **Secure storage** — client secrets and tokens stored in OS keychain (file fallback on Linux without GNOME Keyring)
-- **33 tools** — Mail (9), Calendar (7), Drive (3), Sheets (4), Docs (4), account management (6)
+- **38 tools** — Mail (11), Calendar (7), Drive (3), Sheets (4), Docs (4), Slides (3), account management (6)
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
 
@@ -42,6 +42,24 @@ surface (Slides, Forms, Chat, Tasks, …), a single-account server like
 [taylorwilsdon/google_workspace_mcp](https://github.com/taylorwilsdon/google_workspace_mcp)
 may fit better. GWS Connector focuses on doing multi-account Gmail / Calendar /
 Drive / Sheets / Docs cleanly and securely.
+
+## Upgrading (Google Slides tools)
+
+The Slides tools (`gws.slides.*`) add one new OAuth scope,
+`https://www.googleapis.com/auth/presentations`. **Existing users must
+re-authorize each connected account** so new tokens are minted with the
+Slides scope:
+
+```
+/gws:reauth
+```
+
+You must also enable the **Slides API** and add the `presentations` scope in
+your GCP project's OAuth consent screen configuration before re-auth, or the
+consent screen will reject the request (see [Google Cloud
+Setup](#google-cloud-setup)). Until you re-authorize, `gws.slides.*` calls
+return a scope error telling the agent to run `gws.accounts.reauth`; all other
+tools keep working.
 
 ## Upgrading from v0.2.x
 
@@ -216,6 +234,8 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.mail.read_thread` | Read an entire thread |
 | `gws.mail.create_draft` | Create an email draft |
 | `gws.mail.send_draft` | Send an existing draft |
+| `gws.mail.forward` | Build a forward draft of a message (does not send) |
+| `gws.mail.get_attachment` | Fetch a message attachment's bytes (base64) |
 | `gws.mail.list_labels` | List Gmail labels |
 | `gws.mail.create_label` | Create a new label |
 | `gws.mail.modify_message` | Add/remove labels on a message |
@@ -238,6 +258,9 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.docs.insert_text` | Insert literal text at a location |
 | `gws.docs.replace_text` | Replace all occurrences of a literal substring |
 | `gws.docs.create` | Create a new document |
+| `gws.slides.get` | Read a presentation (slide count + per-slide text) |
+| `gws.slides.create` | Create a new presentation |
+| `gws.slides.batch_update` | Apply raw Slides API requests to a presentation |
 
 ### Skills
 
@@ -293,6 +316,7 @@ One-time setup (~5 minutes):
    - [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
    - [Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
    - [Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
+   - [Slides API](https://console.cloud.google.com/apis/library/slides.googleapis.com)
 
 3. **Configure the [OAuth consent screen](https://console.cloud.google.com/auth/consent)**:
    - Choose "External" (or "Internal" for Google Workspace orgs)
@@ -301,12 +325,13 @@ One-time setup (~5 minutes):
 
 4. **Add scopes** — go to [Data Access](https://console.cloud.google.com/auth/scopes):
    - Click "Add or Remove Scopes"
-   - Add these 7 scopes (paste into the "Manually add scopes" box):
+   - Add these 8 scopes (paste into the "Manually add scopes" box):
      - `https://www.googleapis.com/auth/gmail.modify`
      - `https://www.googleapis.com/auth/calendar`
      - `https://www.googleapis.com/auth/drive`
      - `https://www.googleapis.com/auth/spreadsheets`
      - `https://www.googleapis.com/auth/documents`
+     - `https://www.googleapis.com/auth/presentations`
      - `https://www.googleapis.com/auth/userinfo.email`
      - `https://www.googleapis.com/auth/userinfo.profile`
    - Click "Update", then "Save"
@@ -320,6 +345,7 @@ One-time setup (~5 minutes):
    | `drive` | Search and read files and metadata across Drive | `gws.drive.*` |
    | `spreadsheets` | Read and write Google Sheets cell data and metadata | `gws.sheets.*` |
    | `documents` | Read and write Google Docs content | `gws.docs.*` |
+   | `presentations` | Read and write Google Slides content | `gws.slides.*` |
    | `userinfo.email` | Identify the authorizing account (email match on reauth) | account management |
    | `userinfo.profile` | Store a display name alongside the email | account management |
 
