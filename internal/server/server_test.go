@@ -13,10 +13,10 @@ func testServer(t *testing.T) *Server {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := Config{
-		StateDir:    dir,
-		ClientID:    "test-client-id",
+		StateDir:     dir,
+		ClientID:     "test-client-id",
 		ClientSecret: "test-client-secret",
-		UseDotNames: true,
+		UseDotNames:  true,
 	}
 	return New(cfg)
 }
@@ -96,10 +96,10 @@ func TestHandleAccountsAddMissingLabel(t *testing.T) {
 func TestHandleAccountsAddMissingCredentials(t *testing.T) {
 	dir := t.TempDir()
 	s := New(Config{
-		StateDir:    dir,
-		ClientID:    "", // no credentials
+		StateDir:     dir,
+		ClientID:     "", // no credentials
 		ClientSecret: "",
-		UseDotNames: true,
+		UseDotNames:  true,
 	})
 
 	req := mcp.CallToolRequest{}
@@ -118,10 +118,10 @@ func TestHandleAccountsAddMissingCredentials(t *testing.T) {
 func TestHandleAccountsAddPerAccountCredentialsOverride(t *testing.T) {
 	dir := t.TempDir()
 	s := New(Config{
-		StateDir:    dir,
-		ClientID:    "", // no global credentials
+		StateDir:     dir,
+		ClientID:     "", // no global credentials
 		ClientSecret: "",
-		UseDotNames: true,
+		UseDotNames:  true,
 	})
 
 	req := mcp.CallToolRequest{}
@@ -245,6 +245,9 @@ func TestAllToolsRegistered(t *testing.T) {
 		"gws.cal.list_events",
 		"gws.cal.get_event",
 		"gws.cal.create_event",
+		"gws.cal.update_event",
+		"gws.cal.delete_event",
+		"gws.cal.free_busy",
 		"gws.cal.list_calendars",
 		// Drive
 		"gws.drive.search",
@@ -296,6 +299,57 @@ func TestToolHasAccountParam(t *testing.T) {
 		} else {
 			t.Errorf("tool %q not found", toolName)
 		}
+	}
+}
+
+// Guards the mark3labs/mcp-go gotcha: NewTool defaults destructiveHint to
+// true, so update_event (a reversible, additive modify) must set it false
+// explicitly, while delete_event must keep it true.
+func TestCalendarWriteToolAnnotations(t *testing.T) {
+	s := testServer(t)
+	tools := s.mcpServer.ListTools()
+
+	boolVal := func(p *bool) string {
+		if p == nil {
+			return "unset"
+		}
+		if *p {
+			return "true"
+		}
+		return "false"
+	}
+
+	// update_event: reversible modify — neither readOnly nor destructive true.
+	if tool, ok := tools["gws.cal.update_event"]; ok {
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("update_event destructiveHint should be false, got %s", boolVal(a.DestructiveHint))
+		}
+		if a.ReadOnlyHint != nil && *a.ReadOnlyHint {
+			t.Errorf("update_event readOnlyHint should not be true, got %s", boolVal(a.ReadOnlyHint))
+		}
+	} else {
+		t.Error("gws.cal.update_event not registered")
+	}
+
+	// delete_event: genuinely destructive.
+	if tool, ok := tools["gws.cal.delete_event"]; ok {
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != true {
+			t.Errorf("delete_event destructiveHint should be true, got %s", boolVal(a.DestructiveHint))
+		}
+	} else {
+		t.Error("gws.cal.delete_event not registered")
+	}
+
+	// free_busy: read-only.
+	if tool, ok := tools["gws.cal.free_busy"]; ok {
+		a := tool.Tool.Annotations
+		if a.ReadOnlyHint == nil || *a.ReadOnlyHint != true {
+			t.Errorf("free_busy readOnlyHint should be true, got %s", boolVal(a.ReadOnlyHint))
+		}
+	} else {
+		t.Error("gws.cal.free_busy not registered")
 	}
 }
 

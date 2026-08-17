@@ -677,6 +677,63 @@ func (s *Server) registerCalendarTools() {
 	)
 
 	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "cal", "update_event"),
+			mcp.WithReadOnlyHintAnnotation(false),
+			// Reversible, additive modify: only provided fields change and the
+			// event still exists afterwards, so this is NOT destructive. Must be
+			// set explicitly — NewTool defaults destructiveHint to true.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Update (reschedule/edit) an existing calendar event "+
+				"using patch semantics: only the fields you provide change, all "+
+				"others are left untouched. start and end are RFC3339 timestamps "+
+				"(include the timezone offset). Defaults to the primary calendar "+
+				"unless calendarId is given. Returns the updated event's title, "+
+				"times, ID, and link. Preview the changes with the user before calling."),
+			mcp.WithString("eventId", mcp.Required(), mcp.Description("Event ID to update")),
+			mcp.WithString("summary", mcp.Description("New event title")),
+			mcp.WithString("start", mcp.Description("New start time (RFC3339)")),
+			mcp.WithString("end", mcp.Description("New end time (RFC3339)")),
+			mcp.WithString("description", mcp.Description("New event description")),
+			mcp.WithString("location", mcp.Description("New event location")),
+			mcp.WithString("calendarId", mcp.Description("Calendar ID (default: primary)")),
+			accountParam,
+		),
+		s.calSvc.UpdateEvent,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "cal", "delete_event"),
+			// Deleting (cancelling) an event is genuinely destructive.
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithDescription("Delete (cancel) a calendar event. Defaults to the "+
+				"primary calendar unless calendarId is given. This removes the event "+
+				"for all attendees and cannot be undone — confirm with the user before "+
+				"calling. Returns the deleted event's ID and calendar."),
+			mcp.WithString("eventId", mcp.Required(), mcp.Description("Event ID to delete")),
+			mcp.WithString("calendarId", mcp.Description("Calendar ID (default: primary)")),
+			accountParam,
+		),
+		s.calSvc.DeleteEvent,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "cal", "free_busy"),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Query free/busy status for one or more calendars over "+
+				"a time range. timeMin and timeMax are RFC3339 timestamps. Defaults to "+
+				"the primary calendar unless calendarIds is given. Returns the busy "+
+				"intervals per calendar (or free-for-the-range). Use this to find open "+
+				"slots before scheduling."),
+			mcp.WithString("timeMin", mcp.Required(), mcp.Description("Start of range (RFC3339)")),
+			mcp.WithString("timeMax", mcp.Required(), mcp.Description("End of range (RFC3339)")),
+			mcp.WithArray("calendarIds", mcp.Description("Calendar IDs to check (default: [\"primary\"])")),
+			accountParam,
+		),
+		s.calSvc.FreeBusy,
+	)
+
+	s.mcpServer.AddTool(
 		mcp.NewTool(s.toolName("gws", "cal", "list_calendars"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),

@@ -4,7 +4,7 @@
   "display_name": "GWS Connector",
   "version": "__VERSION__",
   "description": "Multi-account Google Workspace MCP server — Gmail, Calendar, Drive, Sheets, and Docs with smart account routing.",
-  "long_description": "Connect multiple Gmail and Google Workspace accounts (personal + work, multiple clients, different orgs) and route requests by label, email, or domain. Bring-your-own OAuth credentials; secrets and tokens are stored in the OS keychain. 30 tools across Mail, Calendar, Drive, Sheets, Docs, and account management.",
+  "long_description": "Connect multiple Gmail and Google Workspace accounts (personal + work, multiple clients, different orgs) and route requests by label, email, or domain. Bring-your-own OAuth credentials; secrets and tokens are stored in the OS keychain. 33 tools across Mail, Calendar, Drive, Sheets, Docs, and account management.",
   "author": {
     "name": "Nicolas Brousse",
     "url": "https://github.com/orieg"
