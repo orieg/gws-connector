@@ -54,6 +54,13 @@ const WriteToolWarning = "This tool irreversibly modifies user content. " +
 	"Confirm intent with the user before calling it on documents you did " +
 	"not create in this session."
 
+// CreateToolNote is appended to the description of tools that create a NEW
+// document. Unlike WriteToolWarning, these tools are additive
+// (destructiveHint=false): they never touch existing content, so the note
+// states the return value instead of a destructive-write warning.
+const CreateToolNote = "Creates a new, empty document owned by the account and " +
+	"returns its ID and shareable URL. It never modifies existing content."
+
 // a1RangePattern validates Google Sheets A1 notation, permissively enough to
 // cover the forms agents produce in practice.
 //
@@ -74,7 +81,7 @@ const rangeSpec = `[A-Za-z]+[0-9]+(?::[A-Za-z]+[0-9]+)?` +
 	`|[0-9]+:[0-9]+`
 
 // sheetName matches either an unquoted simple name or a single-quoted name
-// that may contain escaped quotes (''). Unquoted names permit letters,
+// that may contain escaped quotes (”). Unquoted names permit letters,
 // digits, spaces, and common punctuation that Google Sheets tolerates.
 const sheetName = `'(?:[^']|'')+'|[A-Za-z0-9 _.\-]+`
 
@@ -323,11 +330,11 @@ func (s *SheetsService) ListTabs(ctx context.Context, req mcp.CallToolRequest) (
 	}
 
 	type tabRow struct {
-		Title      string `json:"title"`
-		SheetID    int64  `json:"sheet_id"`
-		Index      int64  `json:"index"`
-		RowCount   int64  `json:"row_count"`
-		ColumnCount int64 `json:"column_count"`
+		Title       string `json:"title"`
+		SheetID     int64  `json:"sheet_id"`
+		Index       int64  `json:"index"`
+		RowCount    int64  `json:"row_count"`
+		ColumnCount int64  `json:"column_count"`
 	}
 
 	tabs := make([]tabRow, 0, len(ss.Sheets))
