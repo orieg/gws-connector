@@ -263,6 +263,9 @@ func TestAllToolsRegistered(t *testing.T) {
 		"gws.docs.insert_text",
 		"gws.docs.replace_text",
 		"gws.docs.create",
+		// Contacts / People
+		"gws.contacts.search",
+		"gws.contacts.directory_search",
 	}
 
 	for _, name := range expected {
@@ -350,6 +353,39 @@ func TestCalendarWriteToolAnnotations(t *testing.T) {
 		}
 	} else {
 		t.Error("gws.cal.free_busy not registered")
+	}
+}
+
+// Guards the mark3labs/mcp-go gotcha (NewTool defaults destructiveHint=true)
+// for the read-only Contacts tools: both must be readOnly=true and
+// destructive=false explicitly.
+func TestContactsToolAnnotations(t *testing.T) {
+	s := testServer(t)
+	tools := s.mcpServer.ListTools()
+
+	boolVal := func(p *bool) string {
+		if p == nil {
+			return "unset"
+		}
+		if *p {
+			return "true"
+		}
+		return "false"
+	}
+
+	for _, name := range []string{"gws.contacts.search", "gws.contacts.directory_search"} {
+		tool, ok := tools[name]
+		if !ok {
+			t.Errorf("%s not registered", name)
+			continue
+		}
+		a := tool.Tool.Annotations
+		if a.ReadOnlyHint == nil || *a.ReadOnlyHint != true {
+			t.Errorf("%s readOnlyHint should be true, got %s", name, boolVal(a.ReadOnlyHint))
+		}
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("%s destructiveHint should be false, got %s", name, boolVal(a.DestructiveHint))
+		}
 	}
 }
 

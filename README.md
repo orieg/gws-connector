@@ -19,7 +19,7 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Smart routing** — target accounts by label (`work`), email, or domain
 - **Per-account OAuth** — different orgs can use their own GCP credentials
 - **Secure storage** — client secrets and tokens stored in OS keychain (file fallback on Linux without GNOME Keyring)
-- **33 tools** — Mail (9), Calendar (7), Drive (3), Sheets (4), Docs (4), account management (6)
+- **35 tools** — Mail (9), Calendar (7), Drive (3), Sheets (4), Docs (4), Contacts (2), account management (6)
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
 
@@ -42,6 +42,28 @@ surface (Slides, Forms, Chat, Tasks, …), a single-account server like
 [taylorwilsdon/google_workspace_mcp](https://github.com/taylorwilsdon/google_workspace_mcp)
 may fit better. GWS Connector focuses on doing multi-account Gmail / Calendar /
 Drive / Sheets / Docs cleanly and securely.
+
+## Upgrading — Contacts / People API
+
+The Contacts tools (`gws.contacts.search`, `gws.contacts.directory_search`)
+add two new read-only OAuth scopes (`contacts.readonly`, `directory.readonly`).
+**Existing users must re-authorize each connected account** so new tokens are
+minted with these scopes:
+
+```
+/gws:reauth
+```
+
+Before approving the browser consent screen, review what the new scopes grant —
+read-only access to your Google Contacts and (for Workspace accounts) the
+organization directory. See the [scope rationale table](#google-cloud-setup)
+below for details.
+
+You must also enable the **People API** and add the two new scopes in your GCP
+project's OAuth consent screen configuration before re-auth, or the consent
+screen will reject the request. `gws.contacts.directory_search` requires a
+Google Workspace account — personal Gmail accounts have no organization
+directory and receive a clear explanatory message instead of results.
 
 ## Upgrading from v0.2.x
 
@@ -238,6 +260,8 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.docs.insert_text` | Insert literal text at a location |
 | `gws.docs.replace_text` | Replace all occurrences of a literal substring |
 | `gws.docs.create` | Create a new document |
+| `gws.contacts.search` | Search your own contacts by name/email/phone (returns name, emails, phones) |
+| `gws.contacts.directory_search` | Search the Workspace org directory (returns name, emails); Workspace accounts only |
 
 ### Skills
 
@@ -293,6 +317,7 @@ One-time setup (~5 minutes):
    - [Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
    - [Sheets API](https://console.cloud.google.com/apis/library/sheets.googleapis.com)
    - [Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com)
+   - [People API](https://console.cloud.google.com/apis/library/people.googleapis.com)
 
 3. **Configure the [OAuth consent screen](https://console.cloud.google.com/auth/consent)**:
    - Choose "External" (or "Internal" for Google Workspace orgs)
@@ -301,12 +326,14 @@ One-time setup (~5 minutes):
 
 4. **Add scopes** — go to [Data Access](https://console.cloud.google.com/auth/scopes):
    - Click "Add or Remove Scopes"
-   - Add these 7 scopes (paste into the "Manually add scopes" box):
+   - Add these 9 scopes (paste into the "Manually add scopes" box):
      - `https://www.googleapis.com/auth/gmail.modify`
      - `https://www.googleapis.com/auth/calendar`
      - `https://www.googleapis.com/auth/drive`
      - `https://www.googleapis.com/auth/spreadsheets`
      - `https://www.googleapis.com/auth/documents`
+     - `https://www.googleapis.com/auth/contacts.readonly`
+     - `https://www.googleapis.com/auth/directory.readonly`
      - `https://www.googleapis.com/auth/userinfo.email`
      - `https://www.googleapis.com/auth/userinfo.profile`
    - Click "Update", then "Save"
@@ -320,6 +347,8 @@ One-time setup (~5 minutes):
    | `drive` | Search and read files and metadata across Drive | `gws.drive.*` |
    | `spreadsheets` | Read and write Google Sheets cell data and metadata | `gws.sheets.*` |
    | `documents` | Read and write Google Docs content | `gws.docs.*` |
+   | `contacts.readonly` | Read-only search of your own Google Contacts | `gws.contacts.search` |
+   | `directory.readonly` | Read-only search of the Workspace org directory (Workspace accounts only) | `gws.contacts.directory_search` |
    | `userinfo.email` | Identify the authorizing account (email match on reauth) | account management |
    | `userinfo.profile` | Store a display name alongside the email | account management |
 

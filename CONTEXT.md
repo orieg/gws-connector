@@ -46,6 +46,12 @@ At the beginning of a session, if the user hasn't specified what they need:
 - Regular files are downloaded with a 5MB size limit for text content
 - Use Drive search query syntax: `name contains 'report'`, `mimeType = 'application/pdf'`
 
+## Contacts Operations
+
+- Use `gws.contacts.search` to resolve a person's name to an email address before drafting mail, or to look up a phone number — it searches the account's own contacts and returns names, emails, and phones
+- Use `gws.contacts.directory_search` to find coworkers in a Google Workspace organization directory; it works only for Workspace accounts (personal Gmail returns a clear "Workspace only" message, not results)
+- Both tools are read-only and per-account — pass `account` to disambiguate which account's contacts/directory to search
+
 ## Safety
 
 - Never execute write operations (create draft, create event) without user confirmation
