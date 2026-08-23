@@ -1,33 +1,120 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  detect-changes:
+    name: Subsystems / Change Detection
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      ts: ${{ steps.filter.outputs.ts }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            go:
+              - 'cmd/**'
+              - 'internal/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'scripts/**'
+              - 'mcpb/**'
+              - '.github/workflows/ci.yml'
+            ts:
+              - 'docs/**'
+              - '*.json'
+              - 'hooks/**'
+              - 'skills/**'
+              - 'package*.json'
+              - 'tsconfig*.json'
+              - 'src/**'
+              - '.github/workflows/ci.yml'
+
+  lint:
+    name: Lint & Standards (golangci-lint & Biome)
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.go == 'true' || needs.detect-changes.outputs.ts == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        if: needs.detect-changes.outputs.go == 'true' || github.event_name != 'pull_request'
+        uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: true
+
+      - name: Go Vet
+        if: needs.detect-changes.outputs.go == 'true' || github.event_name != 'pull_request'
+        run: go vet ./...
+
+      - name: golangci-lint
+        if: needs.detect-changes.outputs.go == 'true' || github.event_name != 'pull_request'
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+        continue-on-error: true
+
+      - name: ShellCheck
+        run: |
+          if compgen -G "scripts/*.sh" > /dev/null; then
+            shellcheck scripts/*.sh
+          fi
+          if compgen -G "mcpb/*.sh" > /dev/null; then
+            shellcheck mcpb/*.sh
+          fi
+
+      - name: Setup Biome
+        uses: biomejs/setup-biome@v2
+        with:
+          version: latest
+
+      - name: Run Biome Check
+        run: |
+          biome check --files-ignore-unknown=true . || true
+
+  test:
+    name: Test (${{ matrix.os }})
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.go == 'true' || github.event_name != 'pull_request'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: Download dependencies
         run: go mod download
 
       - name: Verify dependencies
         run: go mod verify
-
-      - name: Vet
-        run: go vet ./...
 
       - name: Build
         run: |
@@ -38,7 +125,42 @@ jobs:
         run: go test -race -count=1 ./...
 
       - name: Cross-compile (darwin/arm64)
+        if: matrix.os == 'ubuntu-latest'
         run: GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/gws-mcp
 
       - name: Cross-compile (linux/arm64)
+        if: matrix.os == 'ubuntu-latest'
         run: GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/gws-mcp
+
+  ci-gate:
+    name: CI Gate / All Checks Passed
+    if: always()
+    needs:
+      - detect-changes
+      - lint
+      - test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate Dependency Statuses
+        shell: bash
+        run: |
+          echo "Evaluating CI matrix health..."
+          STATUSES='${{ toJson(needs) }}'
+          FAILED=()
+
+          for job in $(echo "$STATUSES" | jq -r 'keys[]'); do
+            result=$(echo "$STATUSES" | jq -r --arg j "$job" '.[$j].result')
+            echo "  Job [$job]: $result"
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              FAILED+=("$job")
+            fi
+          done
+
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            echo "::error::The following required checks failed: ${FAILED[*]}"
+            exit 1
+          fi
+
+          echo "::notice::All applicable CI checks passed (or were cleanly skipped by path filters)."
+          exit 0
