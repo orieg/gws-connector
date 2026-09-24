@@ -1,6 +1,6 @@
 BINARY := gws-mcp
 MODULE := github.com/orieg/gws-connector
-VERSION := 0.4.0
+VERSION := 0.4.1
 
 GO ?= $(shell which go)
 
