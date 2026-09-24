@@ -298,6 +298,8 @@ gws.drive.search(account: "alice@company.com", q: "quarterly report")
 | `gws.sheets.clear` | Clear values in a range (formatting left intact) |
 | `gws.sheets.create` | Create a new spreadsheet |
 | `gws.sheets.list_tabs` | List tabs (sheets) in a spreadsheet |
+| `gws.sheets.duplicate_tab` | Duplicate a tab (with formatting) inside a spreadsheet |
+| `gws.sheets.add_tab` | Add a new empty tab to a spreadsheet |
 | `gws.docs.read` | Read a document as plain text |
 | `gws.docs.insert_text` | Insert literal text at a location |
 | `gws.docs.replace_text` | Replace all occurrences of a literal substring |

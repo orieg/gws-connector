@@ -948,6 +948,50 @@ func (s *Server) registerSheetsTools() {
 		),
 		s.sheetsSvc.ListTabs,
 	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "sheets", "duplicate_tab"),
+			// Additive: creates a new tab and refuses when new_title is taken,
+			// so existing content is never overwritten. NewTool defaults
+			// destructiveHint to true, so it must be set false explicitly.
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Duplicate an existing tab (sheet) within the same "+
+				"Google Spreadsheet, e.g. copy last month's invoice tab to start this "+
+				"month's. Uses DuplicateSheetRequest, so values, formulas, formatting, "+
+				"merged cells, and column widths are copied. Identify the source with "+
+				"source_tab (exact title) or source_sheet_id (from list_tabs). "+
+				"insert_index is the zero-based position of the new tab (default: last). "+
+				"Returns an error — without changing anything — if a tab named "+
+				"new_title already exists. Returns the new tab's title, sheet_id, and "+
+				"index. This tool modifies the user's document: confirm intent with "+
+				"the user before calling it on documents you did not create in this session."),
+			mcp.WithString("spreadsheet_id", mcp.Required(), mcp.Description("The spreadsheet ID")),
+			mcp.WithString("source_tab", mcp.Description("Title of the tab to copy (either this or source_sheet_id is required)")),
+			mcp.WithNumber("source_sheet_id", mcp.Description("Sheet ID of the tab to copy (either this or source_tab is required)")),
+			mcp.WithString("new_title", mcp.Required(), mcp.Description("Title for the new tab; must not already exist")),
+			mcp.WithNumber("insert_index", mcp.Description("Zero-based position for the new tab (default: after the last tab)")),
+			accountParam,
+		),
+		s.sheetsSvc.DuplicateTab,
+	)
+
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "sheets", "add_tab"),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Add a new, empty tab (sheet) to a Google Spreadsheet "+
+				"using AddSheetRequest. index is the zero-based position (default: "+
+				"last). Returns an error — without changing anything — if a tab with "+
+				"the same title already exists. Returns the new tab's title, sheet_id, "+
+				"and index. This tool modifies the user's document: confirm intent "+
+				"with the user before calling it on documents you did not create in "+
+				"this session."),
+			mcp.WithString("spreadsheet_id", mcp.Required(), mcp.Description("The spreadsheet ID")),
+			mcp.WithString("title", mcp.Required(), mcp.Description("Title for the new tab; must not already exist")),
+			mcp.WithNumber("index", mcp.Description("Zero-based position for the new tab (default: after the last tab)")),
+			accountParam,
+		),
+		s.sheetsSvc.AddTab,
+	)
 }
 
 func (s *Server) registerDocsTools() {

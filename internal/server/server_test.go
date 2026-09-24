@@ -262,6 +262,8 @@ func TestAllToolsRegistered(t *testing.T) {
 		"gws.sheets.clear",
 		"gws.sheets.create",
 		"gws.sheets.list_tabs",
+		"gws.sheets.duplicate_tab",
+		"gws.sheets.add_tab",
 		// Docs
 		"gws.docs.read",
 		"gws.docs.insert_text",
@@ -403,6 +405,27 @@ func TestSheetsWriteToolAnnotations(t *testing.T) {
 		}
 	} else {
 		t.Error("gws.sheets.clear not registered")
+	}
+
+	// duplicate_tab / add_tab: additive (refuse on name clash), so
+	// destructiveHint false, but the description must still carry the
+	// confirm-intent warning.
+	for _, name := range []string{"gws.sheets.duplicate_tab", "gws.sheets.add_tab"} {
+		tool, ok := tools[name]
+		if !ok {
+			t.Errorf("%s not registered", name)
+			continue
+		}
+		a := tool.Tool.Annotations
+		if a.DestructiveHint == nil || *a.DestructiveHint != false {
+			t.Errorf("%s destructiveHint should be false, got %s", name, boolVal(a.DestructiveHint))
+		}
+		if !strings.Contains(tool.Tool.Description, "confirm intent") {
+			t.Errorf("%s description should ask to confirm intent", name)
+		}
+		if !strings.Contains(tool.Tool.Description, "already exists") {
+			t.Errorf("%s description should document the name-clash error", name)
+		}
 	}
 }
 

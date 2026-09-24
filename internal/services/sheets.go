@@ -485,7 +485,234 @@ func (s *SheetsService) ListTabs(ctx context.Context, req mcp.CallToolRequest) (
 	return TextAndJSONResult(sb.String(), payload), nil
 }
 
+// DuplicateTab copies an existing tab (sheet) inside the same spreadsheet via
+// DuplicateSheetRequest, so formatting, merged cells, column widths,
+// formulas, and data validation come along. The source is identified by
+// source_tab (title) or source_sheet_id. It refuses to proceed when a tab
+// named new_title already exists, so it never overwrites anything.
+func (s *SheetsService) DuplicateTab(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	svc, acct, err := s.resolveAndGetService(ctx, args)
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	spreadsheetID, _ := args["spreadsheet_id"].(string)
+	if spreadsheetID == "" {
+		return ErrorResult(fmt.Errorf("spreadsheet_id is required")), nil
+	}
+	newTitle, _ := args["new_title"].(string)
+	newTitle = strings.TrimSpace(newTitle)
+	if newTitle == "" {
+		return ErrorResult(fmt.Errorf("new_title is required")), nil
+	}
+	sourceTitle, _ := args["source_tab"].(string)
+	sourceID, hasSourceID, err := optionalNonNegativeInt(args, "source_sheet_id")
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+	if sourceTitle == "" && !hasSourceID {
+		return ErrorResult(fmt.Errorf("either source_tab (tab title) or source_sheet_id is required")), nil
+	}
+	insertIndex, hasInsertIndex, err := optionalNonNegativeInt(args, "insert_index")
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+	if !hasInsertIndex {
+		insertIndex, hasInsertIndex, err = optionalNonNegativeInt(args, "index")
+		if err != nil {
+			return ErrorResult(err), nil
+		}
+	}
+
+	ss, err := svc.Spreadsheets.Get(spreadsheetID).Fields("spreadsheetId,sheets.properties").Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Sheets", err, "reading tabs on %s: %w", acct.Label, err)), nil
+	}
+	if err := ensureTabTitleFree(ss.Sheets, newTitle); err != nil {
+		return ErrorResult(err), nil
+	}
+	src, err := findSourceTab(ss.Sheets, sourceTitle, sourceID, hasSourceID)
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+	if !hasInsertIndex {
+		insertIndex = int64(len(ss.Sheets)) // append at the end
+	}
+
+	dup := &sheets.DuplicateSheetRequest{
+		SourceSheetId:    src.SheetId,
+		NewSheetName:     newTitle,
+		InsertSheetIndex: insertIndex,
+		// Index 0 is a zero value and would be dropped without this.
+		ForceSendFields: []string{"SourceSheetId", "InsertSheetIndex"},
+	}
+	resp, err := svc.Spreadsheets.BatchUpdate(spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: []*sheets.Request{{DuplicateSheet: dup}},
+	}).Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Sheets", err, "duplicating tab on %s: %w", acct.Label, err)), nil
+	}
+	if len(resp.Replies) == 0 || resp.Replies[0].DuplicateSheet == nil || resp.Replies[0].DuplicateSheet.Properties == nil {
+		return ErrorResult(fmt.Errorf("duplicate tab: empty reply from Sheets API")), nil
+	}
+	p := resp.Replies[0].DuplicateSheet.Properties
+
+	summary := fmt.Sprintf(
+		"Duplicated tab %q (id=%d) as %q (id=%d, index=%d) on %s (%s).",
+		src.Title, src.SheetId, p.Title, p.SheetId, p.Index, acct.Label, acct.Email)
+	payload := map[string]any{
+		"spreadsheet_id":  spreadsheetID,
+		"source_title":    src.Title,
+		"source_sheet_id": src.SheetId,
+		"title":           p.Title,
+		"sheet_id":        p.SheetId,
+		"index":           p.Index,
+	}
+	return TextAndJSONResult(summary, payload), nil
+}
+
+// AddTab adds a new, empty tab (sheet) to a spreadsheet via AddSheetRequest.
+// It refuses to proceed when a tab with the same title already exists.
+func (s *SheetsService) AddTab(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+	svc, acct, err := s.resolveAndGetService(ctx, args)
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+
+	spreadsheetID, _ := args["spreadsheet_id"].(string)
+	if spreadsheetID == "" {
+		return ErrorResult(fmt.Errorf("spreadsheet_id is required")), nil
+	}
+	title, _ := args["title"].(string)
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return ErrorResult(fmt.Errorf("title is required")), nil
+	}
+	index, hasIndex, err := optionalNonNegativeInt(args, "index")
+	if err != nil {
+		return ErrorResult(err), nil
+	}
+	if !hasIndex {
+		index, hasIndex, err = optionalNonNegativeInt(args, "insert_index")
+		if err != nil {
+			return ErrorResult(err), nil
+		}
+	}
+
+	ss, err := svc.Spreadsheets.Get(spreadsheetID).Fields("spreadsheetId,sheets.properties").Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Sheets", err, "reading tabs on %s: %w", acct.Label, err)), nil
+	}
+	if err := ensureTabTitleFree(ss.Sheets, title); err != nil {
+		return ErrorResult(err), nil
+	}
+
+	props := &sheets.SheetProperties{Title: title}
+	if hasIndex {
+		props.Index = index
+		// Index 0 is a zero value and would be dropped without this.
+		props.ForceSendFields = []string{"Index"}
+	}
+	resp, err := svc.Spreadsheets.BatchUpdate(spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: []*sheets.Request{{AddSheet: &sheets.AddSheetRequest{Properties: props}}},
+	}).Do()
+	if err != nil {
+		return ErrorResult(scopeOrErr(acct, "Sheets", err, "adding tab on %s: %w", acct.Label, err)), nil
+	}
+	if len(resp.Replies) == 0 || resp.Replies[0].AddSheet == nil || resp.Replies[0].AddSheet.Properties == nil {
+		return ErrorResult(fmt.Errorf("add tab: empty reply from Sheets API")), nil
+	}
+	p := resp.Replies[0].AddSheet.Properties
+
+	summary := fmt.Sprintf(
+		"Added tab %q (id=%d, index=%d) on %s (%s).",
+		p.Title, p.SheetId, p.Index, acct.Label, acct.Email)
+	payload := map[string]any{
+		"spreadsheet_id": spreadsheetID,
+		"title":          p.Title,
+		"sheet_id":       p.SheetId,
+		"index":          p.Index,
+	}
+	return TextAndJSONResult(summary, payload), nil
+}
+
 // --- helpers ---
+
+// optionalNonNegativeInt reads an optional integer argument. MCP delivers
+// JSON numbers as float64. present is false when the key is absent or null.
+func optionalNonNegativeInt(args map[string]any, key string) (value int64, present bool, err error) {
+	raw, ok := args[key]
+	if !ok || raw == nil {
+		return 0, false, nil
+	}
+	var f float64
+	switch v := raw.(type) {
+	case float64:
+		f = v
+	case int:
+		f = float64(v)
+	case int64:
+		f = float64(v)
+	case json.Number:
+		f, err = v.Float64()
+		if err != nil {
+			return 0, false, fmt.Errorf("%s must be a non-negative integer", key)
+		}
+	default:
+		return 0, false, fmt.Errorf("%s must be a non-negative integer, got %T", key, raw)
+	}
+	if f < 0 || f != float64(int64(f)) {
+		return 0, false, fmt.Errorf("%s must be a non-negative integer, got %v", key, f)
+	}
+	return int64(f), true, nil
+}
+
+// ensureTabTitleFree returns an error when a tab with title already exists.
+// Google Sheets treats tab names case-insensitively, so the comparison does
+// too.
+func ensureTabTitleFree(tabs []*sheets.Sheet, title string) error {
+	trimmed := strings.TrimSpace(title)
+	for _, sh := range tabs {
+		if sh.Properties != nil && strings.EqualFold(strings.TrimSpace(sh.Properties.Title), trimmed) {
+			return fmt.Errorf("a tab named %q already exists (id=%d); choose a different title — existing tabs are never overwritten",
+				sh.Properties.Title, sh.Properties.SheetId)
+		}
+	}
+	return nil
+}
+
+// findSourceTab resolves the tab to duplicate. When both title and ID are
+// given they must refer to the same tab.
+func findSourceTab(tabs []*sheets.Sheet, title string, id int64, hasID bool) (*sheets.SheetProperties, error) {
+	var byTitle, byID *sheets.SheetProperties
+	for _, sh := range tabs {
+		p := sh.Properties
+		if p == nil {
+			continue
+		}
+		if title != "" && p.Title == title {
+			byTitle = p
+		}
+		if hasID && p.SheetId == id {
+			byID = p
+		}
+	}
+	switch {
+	case title != "" && byTitle == nil:
+		return nil, fmt.Errorf("source tab %q not found (use list_tabs to see exact titles)", title)
+	case hasID && byID == nil:
+		return nil, fmt.Errorf("source_sheet_id %d not found (use list_tabs to see sheet IDs)", id)
+	case byTitle != nil && byID != nil && byTitle.SheetId != byID.SheetId:
+		return nil, fmt.Errorf("source_tab %q (id=%d) and source_sheet_id %d refer to different tabs",
+			title, byTitle.SheetId, id)
+	case byTitle != nil:
+		return byTitle, nil
+	default:
+		return byID, nil
+	}
+}
 
 // coerceCellGrid accepts the loosely-typed `any` value MCP hands us for a
 // `values` parameter and turns it into [][]interface{} ready for the Sheets

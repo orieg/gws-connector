@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	sheets "google.golang.org/api/sheets/v4"
 )
 
 func TestValidateA1Range_Accepts(t *testing.T) {
@@ -206,3 +208,98 @@ func TestFormatOptionalError(t *testing.T) {
 type errorString string
 
 func (e errorString) Error() string { return string(e) }
+
+func testTabs() []*sheets.Sheet {
+	return []*sheets.Sheet{
+		{Properties: &sheets.SheetProperties{Title: "2026年7月", SheetId: 0, Index: 0}},
+		{Properties: &sheets.SheetProperties{Title: "2026年8月", SheetId: 123, Index: 1}},
+		{Properties: nil}, // tolerate malformed entries
+	}
+}
+
+func TestEnsureTabTitleFree(t *testing.T) {
+	tabs := testTabs()
+	if err := ensureTabTitleFree(tabs, "2026年9月"); err != nil {
+		t.Errorf("new title should be free, got %v", err)
+	}
+	err := ensureTabTitleFree(tabs, "2026年8月")
+	if err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("duplicate title should error with 'already exists', got %v", err)
+	}
+}
+
+// Google Sheets tab names are unique case-insensitively ("Sheet1" and
+// "sheet1" clash), so the pre-check must be too.
+func TestEnsureTabTitleFree_CaseInsensitive(t *testing.T) {
+	tabs := []*sheets.Sheet{{Properties: &sheets.SheetProperties{Title: "Invoice", SheetId: 5}}}
+	if err := ensureTabTitleFree(tabs, "invoice"); err == nil {
+		t.Error("expected case-insensitive clash to error")
+	}
+}
+
+func TestEnsureTabTitleFree_Whitespace(t *testing.T) {
+	tabs := []*sheets.Sheet{{Properties: &sheets.SheetProperties{Title: "Invoice", SheetId: 5}}}
+	if err := ensureTabTitleFree(tabs, "  invoice  "); err == nil {
+		t.Error("expected whitespace-padded clash to error")
+	}
+}
+
+func TestFindSourceTab(t *testing.T) {
+	tabs := testTabs()
+
+	p, err := findSourceTab(tabs, "2026年8月", 0, false)
+	if err != nil || p.SheetId != 123 {
+		t.Errorf("by title: got %v, %v", p, err)
+	}
+	// sheet_id 0 is valid (the first tab usually has it).
+	p, err = findSourceTab(tabs, "", 0, true)
+	if err != nil || p.Title != "2026年7月" {
+		t.Errorf("by id 0: got %v, %v", p, err)
+	}
+	p, err = findSourceTab(tabs, "2026年8月", 123, true)
+	if err != nil || p.SheetId != 123 {
+		t.Errorf("title+id agree: got %v, %v", p, err)
+	}
+}
+
+func TestFindSourceTab_Errors(t *testing.T) {
+	tabs := testTabs()
+	cases := []struct {
+		name  string
+		title string
+		id    int64
+		hasID bool
+		want  string
+	}{
+		{"missing title", "2025年1月", 0, false, "not found"},
+		{"missing id", "", 999, true, "not found"},
+		{"title and id disagree", "2026年8月", 0, true, "different tabs"},
+	}
+	for _, c := range cases {
+		if _, err := findSourceTab(tabs, c.title, c.id, c.hasID); err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: expected error containing %q, got %v", c.name, c.want, err)
+		}
+	}
+}
+
+func TestOptionalNonNegativeInt(t *testing.T) {
+	if _, present, err := optionalNonNegativeInt(map[string]any{}, "index"); present || err != nil {
+		t.Errorf("absent key: present=%v err=%v", present, err)
+	}
+	if _, present, err := optionalNonNegativeInt(map[string]any{"index": nil}, "index"); present || err != nil {
+		t.Errorf("null value: present=%v err=%v", present, err)
+	}
+	v, present, err := optionalNonNegativeInt(map[string]any{"index": float64(0)}, "index")
+	if !present || err != nil || v != 0 {
+		t.Errorf("zero must be present: v=%d present=%v err=%v", v, present, err)
+	}
+	v, present, err = optionalNonNegativeInt(map[string]any{"index": json.Number("3")}, "index")
+	if !present || err != nil || v != 3 {
+		t.Errorf("json.Number 3: v=%d present=%v err=%v", v, present, err)
+	}
+	for _, bad := range []any{float64(-1), float64(1.5), "2", true} {
+		if _, _, err := optionalNonNegativeInt(map[string]any{"index": bad}, "index"); err == nil {
+			t.Errorf("expected error for %#v", bad)
+		}
+	}
+}

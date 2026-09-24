@@ -48,6 +48,12 @@ At the beginning of a session, if the user hasn't specified what they need:
 - Regular files are downloaded with a 5MB size limit for text content
 - Use Drive search query syntax: `name contains 'report'`, `mimeType = 'application/pdf'`
 
+## Sheets Operations
+
+- Use `gws.sheets.list_tabs` to get exact tab titles and sheet IDs before reading, writing, or duplicating a tab
+- `gws.sheets.duplicate_tab` copies a tab inside the same spreadsheet (values, formulas, formatting, merged cells, column widths) — e.g. last month's invoice tab → this month's; `gws.sheets.add_tab` adds an empty tab
+- Both refuse (without changing anything) when a tab with the new title already exists — pick another title instead of retrying; confirm with the user before adding tabs to a spreadsheet you did not create
+
 ## Contacts Operations
 
 - Use `gws.contacts.search` to resolve a person's name to an email address before drafting mail, or to look up a phone number — it searches the account's own contacts and returns names, emails, and phones
