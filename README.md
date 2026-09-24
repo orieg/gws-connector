@@ -19,7 +19,7 @@ Most AI coding assistants support a single Google account. If you use multiple G
 - **Smart routing** — target accounts by label (`work`), email, or domain
 - **Per-account OAuth** — different orgs can use their own GCP credentials
 - **Secure storage** — client secrets and tokens stored in OS keychain (file fallback on Linux without GNOME Keyring)
-- **47 tools** — Mail (11), Calendar (7), Drive (3), Sheets (6), Docs (4), Contacts (2), Tasks (5), Slides (3), account management (6)
+- **49 tools** — Mail (11), Calendar (7), Drive (3), Sheets (8), Docs (4), Contacts (2), Tasks (5), Slides (3), account management (6)
 - **Account management** — add, remove, set default, list accounts
 - **Cross-platform** — standard MCP server works with any compatible client
 
