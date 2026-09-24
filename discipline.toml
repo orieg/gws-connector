@@ -1,0 +1,29 @@
+# discipline.toml — configuration for Discipline CI gatekeeper.
+#
+# Schema version 1. Gates run at their built-in default enablement and severity.
+# You only need to specify settings that differ from the defaults.
+# Run `discipline gates` to view the effective status of all gates.
+
+[meta]
+version = 1
+name = "gws-connector"
+
+[gates.pii]
+# The plugin's own state directory lives under ~/.claude (channels/gws, plugins/data/gws);
+# these references are product paths, not a leak of anyone's setup.
+agent_config_refs = false
+
+[gates.instruction-smuggling]
+# The runtime prompt MCP clients load: reviewed like AGENTS.md.
+instruction_files = ["CONTEXT.md"]
+
+[gates.version-lockstep]
+enabled = true
+
+[[gates.version-lockstep.groups]]
+name = "release-version"
+sources = [
+  { path = "Makefile", regex = '(?m)^VERSION\s*:=\s*([0-9]+\.[0-9]+\.[0-9]+)' },
+  { path = ".claude-plugin/marketplace.json", regex = '"version":\s*"([0-9]+\.[0-9]+\.[0-9]+)"' },
+  { path = "gemini-extension.json", regex = '"version":\s*"([0-9]+\.[0-9]+\.[0-9]+)"' },
+]
