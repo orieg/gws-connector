@@ -58,6 +58,9 @@ type Config struct {
 	ClientID     string
 	ClientSecret string
 	UseDotNames  bool
+	// Version is the build version reported in MCP serverInfo (e.g. "v0.4.2"
+	// from ldflags). A leading "v" is stripped; empty reports "dev".
+	Version string
 }
 
 // Server is the GWS MCP server.
@@ -107,13 +110,22 @@ func New(cfg Config) *Server {
 
 	s.mcpServer = mcpserver.NewMCPServer(
 		"gws-connector",
-		"0.1.0",
+		serverVersion(cfg.Version),
 		mcpserver.WithToolCapabilities(true),
 	)
 
 	s.migrateClientSecrets()
 	s.registerTools()
 	return s
+}
+
+// serverVersion normalizes a build version for MCP serverInfo.
+func serverVersion(v string) string {
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	if v == "" {
+		return "dev"
+	}
+	return v
 }
 
 // migrateClientSecrets moves any client secrets from accounts.json (legacy)
