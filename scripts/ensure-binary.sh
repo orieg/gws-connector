@@ -47,15 +47,24 @@ else
 fi
 
 echo "gws-connector: downloading $ASSET ($TAG)..." >&2
+
+# Download to a temp file and rename it into place. Overwriting the existing
+# binary in place keeps its inode, and macOS caches the code signature per
+# vnode: the upgraded binary is then SIGKILLed at launch (exit 137). A rename
+# also guarantees a failed or partial download never replaces a working binary.
+TMP_BINARY="$(mktemp "$DATA_DIR/.gws-mcp.XXXXXX")"
+trap 'rm -f "$TMP_BINARY"' EXIT
+
 if command -v curl >/dev/null 2>&1; then
-  curl -fsSL -o "$BINARY" "$URL"
+  curl -fsSL -o "$TMP_BINARY" "$URL"
 elif command -v wget >/dev/null 2>&1; then
-  wget -qO "$BINARY" "$URL"
+  wget -qO "$TMP_BINARY" "$URL"
 else
   echo "gws-connector: curl or wget required to download binary" >&2
   exit 1
 fi
 
-chmod +x "$BINARY"
+chmod +x "$TMP_BINARY"
+mv -f "$TMP_BINARY" "$BINARY"
 echo "$EXPECTED_VERSION" > "$VERSION_FILE"
 echo "gws-connector: installed $ASSET ($TAG) to $DATA_DIR" >&2
