@@ -4,7 +4,7 @@ VERSION := 0.4.1
 
 GO ?= $(shell which go)
 
-.PHONY: build install clean test lint release
+.PHONY: build install clean test lint release check-versions bump-version
 
 build:
 	$(GO) build -o bin/$(BINARY) ./cmd/gws-mcp
@@ -24,6 +24,15 @@ test-verbose:
 
 lint:
 	$(GO) vet ./...
+
+# Verify every release manifest carries the same version.
+check-versions:
+	scripts/check-versions.sh
+
+# Set the version in every release manifest: make bump-version V=0.4.2
+bump-version:
+	@test -n "$(V)" || (echo "usage: make bump-version V=<major.minor.patch>" >&2; exit 2)
+	scripts/bump-version.sh $(V)
 
 # Cross-compile for release
 release:

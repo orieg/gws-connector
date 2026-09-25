@@ -15,6 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The Claude Code plugin downloads the binary matching plugin.json's
+      # version, so a tag must never ship with a stale manifest.
+      - name: Verify manifest versions match the tag
+        run: scripts/check-versions.sh "${GITHUB_REF_NAME}"
+
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -82,6 +87,7 @@ jobs:
         run: ./mcp-publisher publish
 
   docker:
+    needs: [release]
     runs-on: ubuntu-latest
     permissions:
       contents: read
