@@ -39,6 +39,7 @@ func main() {
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		UseDotNames:  *useDotNames,
+		Version:      version,
 	}
 
 	srv := server.New(cfg)

@@ -638,3 +638,49 @@ func extractText(result *mcp.CallToolResult) string {
 	}
 	return ""
 }
+
+// --- serverInfo version ---
+
+func TestServerInfoVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		want    string
+	}{
+		{"release tag", "v0.4.2", "0.4.2"},
+		{"bare version", "0.4.2", "0.4.2"},
+		{"unset", "", "dev"},
+		{"local build default", "dev", "dev"},
+		{"docker default", "docker", "docker"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := New(Config{StateDir: t.TempDir(), UseDotNames: true, Version: tt.version})
+
+			req := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"0"}}}`
+			resp := s.mcpServer.HandleMessage(context.Background(), json.RawMessage(req))
+
+			raw, err := json.Marshal(resp)
+			if err != nil {
+				t.Fatalf("marshal response: %v", err)
+			}
+			var got struct {
+				Result struct {
+					ServerInfo struct {
+						Name    string `json:"name"`
+						Version string `json:"version"`
+					} `json:"serverInfo"`
+				} `json:"result"`
+			}
+			if err := json.Unmarshal(raw, &got); err != nil {
+				t.Fatalf("unmarshal response %s: %v", raw, err)
+			}
+			if got.Result.ServerInfo.Name != "gws-connector" {
+				t.Errorf("serverInfo.name = %q, want gws-connector (response: %s)", got.Result.ServerInfo.Name, raw)
+			}
+			if got.Result.ServerInfo.Version != tt.want {
+				t.Errorf("serverInfo.version = %q, want %q", got.Result.ServerInfo.Version, tt.want)
+			}
+		})
+	}
+}
