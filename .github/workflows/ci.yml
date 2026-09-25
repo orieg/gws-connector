@@ -91,6 +91,15 @@ jobs:
         run: |
           biome check --files-ignore-unknown=true . || true
 
+  versions:
+    name: Release Manifests / Version Consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check manifest versions agree
+        run: scripts/check-versions.sh
+
   test:
     name: Test (${{ matrix.os }})
     needs: [detect-changes]
@@ -138,6 +147,7 @@ jobs:
     needs:
       - detect-changes
       - lint
+      - versions
       - test
     runs-on: ubuntu-latest
     timeout-minutes: 5

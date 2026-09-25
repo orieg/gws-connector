@@ -78,18 +78,31 @@ both humans and AI coding agents).
 
 ## Releasing & publishing to the MCP Registry
 
-Releases are tag-driven. Pushing a `v*` tag runs
+Releases are tag-driven. First bump the version in every manifest in one PR:
+
+```bash
+make bump-version V=0.4.2   # or: scripts/bump-version.sh 0.4.2
+```
+
+This updates `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`,
+`gemini-extension.json`, and the `Makefile`. `plugin.json` matters most: the
+Claude Code plugin reads its version to decide whether to update and which
+release binary `scripts/ensure-binary.sh` downloads. CI runs
+`scripts/check-versions.sh` on every PR and fails if the manifests disagree.
+
+After the bump merges, tag that commit. Pushing a `v*` tag runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which:
 
-1. Cross-compiles the four binaries (darwin/linux × amd64/arm64).
-2. Assembles an **MCPB bundle** (`gws-mcp.mcpb`) from
+1. Verifies every manifest version equals the tag (the release fails otherwise).
+2. Cross-compiles the four binaries (darwin/linux × amd64/arm64).
+3. Assembles an **MCPB bundle** (`gws-mcp.mcpb`) from
    [`mcpb/manifest.json`](mcpb/manifest.json) + [`mcpb/launch.sh`](mcpb/launch.sh)
    + the binaries. `launch.sh` dispatches to the right binary by OS/arch at
    runtime (MCPB `platform_overrides` only key by OS, not arch).
-3. Renders [`server.json`](server.json) — the `__VERSION__`, `__TAG__`, and
+4. Renders [`server.json`](server.json) — the `__VERSION__`, `__TAG__`, and
    `__SHA256__` placeholders are filled from the tag and the bundle's checksum.
-4. Creates the GitHub release with the binaries and `gws-mcp.mcpb` attached.
-5. Publishes `server.json` to the [official MCP Registry](https://registry.modelcontextprotocol.io)
+5. Creates the GitHub release with the binaries and `gws-mcp.mcpb` attached.
+6. Publishes `server.json` to the [official MCP Registry](https://registry.modelcontextprotocol.io)
    via `mcp-publisher` using **GitHub OIDC** (the `io.github.orieg/*` namespace is
    authorized by the repo owner — no stored token needed).
 
