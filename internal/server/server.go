@@ -133,7 +133,7 @@ func serverVersion(v string) string {
 func (s *Server) migrateClientSecrets() {
 	toMigrate := s.accountStore.MigrateClientSecrets()
 	for _, acct := range toMigrate {
-		if err := s.tokenStore.SaveClientSecret(acct.Email, acct.ClientSecret); err != nil {
+		if err := s.tokenStore.SaveClientSecret(acct.Email, acct.ClientSecret); err != nil { //nolint:staticcheck // SA1019: reading the legacy field is the migration
 			fmt.Fprintf(os.Stderr, "gws-connector: failed to migrate client secret for %s to keychain: %v\n", acct.Email, err)
 			continue
 		}
@@ -262,14 +262,14 @@ func (s *Server) handleAccountsList(ctx context.Context, req mcp.CallToolRequest
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Connected accounts (%d):\n\n", len(accts)))
+	fmt.Fprintf(&sb, "Connected accounts (%d):\n\n", len(accts))
 	for i, a := range accts {
 		def := ""
 		if a.Default {
 			def = " [DEFAULT]"
 		}
-		sb.WriteString(fmt.Sprintf("%d. %s (%s)%s\n", i+1, a.Label, a.Email, def))
-		sb.WriteString(fmt.Sprintf("   Services: %s\n", strings.Join(a.Services, ", ")))
+		fmt.Fprintf(&sb, "%d. %s (%s)%s\n", i+1, a.Label, a.Email, def)
+		fmt.Fprintf(&sb, "   Services: %s\n", strings.Join(a.Services, ", "))
 	}
 	return textResult(sb.String()), nil
 }
@@ -298,7 +298,7 @@ func (s *Server) handleAccountsAdd(ctx context.Context, req mcp.CallToolRequest)
 		return errorResult(fmt.Errorf(
 			"OAuth credentials are required. Pass clientId and clientSecret parameters.\n\n" +
 				"You can get these from your GCP project's OAuth client credentials.\n" +
-				"Run /gws:configure for step-by-step setup instructions.")), nil
+				"Run /gws:configure for step-by-step setup instructions")), nil
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -340,9 +340,14 @@ func (s *Server) handleAccountsRemove(ctx context.Context, req mcp.CallToolReque
 		return errorResult(err), nil
 	}
 
-	// Delete token and client secret from keychain
-	s.tokenStore.Delete(acct.Email)
-	s.tokenStore.DeleteClientSecret(acct.Email)
+	// Delete token and client secret before the registry entry, so a failure
+	// leaves the account listed (and retryable) rather than orphaning them.
+	if err := s.tokenStore.Delete(acct.Email); err != nil {
+		return errorResult(err), nil
+	}
+	if err := s.tokenStore.DeleteClientSecret(acct.Email); err != nil {
+		return errorResult(err), nil
+	}
 
 	// Remove from registry
 	if err := s.accountStore.Remove(account); err != nil {
@@ -367,7 +372,7 @@ func (s *Server) handleAccountsReauth(ctx context.Context, req mcp.CallToolReque
 	clientID, clientSecret := s.clientFactory.CredentialsForAccount(acct.Email)
 	if clientID == "" || clientSecret == "" {
 		return errorResult(fmt.Errorf(
-			"no credentials found for %s (%s). Use /gws:add-account to reconnect with credentials.",
+			"no credentials found for %s (%s). Use /gws:add-account to reconnect with credentials",
 			acct.Label, acct.Email)), nil
 	}
 
@@ -489,7 +494,7 @@ func (s *Server) commitPendingSession(sess *pendingSession, token *oauth2.Token,
 	case "reauth":
 		if !strings.EqualFold(info.Email, sess.targetEmail) {
 			return errorResult(fmt.Errorf(
-				"authorized email %s does not match account %s (%s). Sign in with the correct Google account.",
+				"authorized email %s does not match account %s (%s). Sign in with the correct Google account",
 				info.Email, sess.targetLabel, sess.targetEmail))
 		}
 		if err := s.tokenStore.Save(sess.targetEmail, token); err != nil {

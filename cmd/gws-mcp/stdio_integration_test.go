@@ -87,9 +87,10 @@ func TestStdioServerStaysResponsiveDuringOAuth(t *testing.T) {
 		t.Fatalf("start binary: %v", err)
 	}
 	defer func() {
-		stdin.Close()
-		cmd.Process.Kill()
-		cmd.Wait()
+		// Teardown: the process may already have exited, so these errors are expected.
+		_ = stdin.Close()
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
 	}()
 
 	c := &mcpClient{
@@ -238,8 +239,11 @@ func (c *mcpClient) request(method string, params any, timeout time.Duration) ma
 	}
 	b, _ := json.Marshal(req)
 	c.mu.Lock()
-	c.in.Write(append(b, '\n'))
+	_, err := c.in.Write(append(b, '\n'))
 	c.mu.Unlock()
+	if err != nil {
+		c.t.Fatalf("writing %s request: %v", method, err)
+	}
 
 	select {
 	case resp := <-ch:
@@ -260,8 +264,11 @@ func (c *mcpClient) notify(method string, params any) {
 	}
 	b, _ := json.Marshal(req)
 	c.mu.Lock()
-	c.in.Write(append(b, '\n'))
+	_, err := c.in.Write(append(b, '\n'))
 	c.mu.Unlock()
+	if err != nil {
+		c.t.Fatalf("writing %s notification: %v", method, err)
+	}
 }
 
 func (c *mcpClient) callTool(name string, args map[string]any, timeout time.Duration) map[string]any {

@@ -60,12 +60,10 @@ func (d *DocsService) Read(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 	plain := extractDocPlainText(doc)
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(
-		"Read document %q on %s (%s).\n  ID: %s\n\n",
-		doc.Title, acct.Label, acct.Email, doc.DocumentId))
-	sb.WriteString(fmt.Sprintf(
-		"<untrusted-document-content account=%q source=\"docs/%s\">\n",
-		acct.Label, documentID))
+	fmt.Fprintf(&sb, "Read document %q on %s (%s).\n  ID: %s\n\n",
+		doc.Title, acct.Label, acct.Email, doc.DocumentId)
+	fmt.Fprintf(&sb, "<untrusted-document-content account=%q source=\"docs/%s\">\n",
+		acct.Label, documentID)
 	sb.WriteString(plain)
 	sb.WriteString("\n</untrusted-document-content>")
 
@@ -126,9 +124,9 @@ func (d *DocsService) InsertText(ctx context.Context, req mcp.CallToolRequest) (
 		len([]rune(text)), documentID, acct.Label, acct.Email, location)
 
 	payload := map[string]any{
-		"document_id":       documentID,
+		"document_id":         documentID,
 		"inserted_characters": len([]rune(text)),
-		"location":          location,
+		"location":            location,
 	}
 	return TextAndJSONResult(summary, payload), nil
 }
@@ -234,12 +232,10 @@ func (d *DocsService) Create(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(
-		"Created document %q on %s (%s).\n  ID: %s\n  URL: https://docs.google.com/document/d/%s/edit",
-		doc.Title, acct.Label, acct.Email, doc.DocumentId, doc.DocumentId))
+	fmt.Fprintf(&sb, "Created document %q on %s (%s).\n  ID: %s\n  URL: https://docs.google.com/document/d/%s/edit",
+		doc.Title, acct.Label, acct.Email, doc.DocumentId, doc.DocumentId)
 	if seedErr != nil {
-		sb.WriteString(fmt.Sprintf(
-			"\n  WARNING: document created but initial_text insert failed: %v", seedErr))
+		fmt.Fprintf(&sb, "\n  WARNING: document created but initial_text insert failed: %v", seedErr)
 	}
 
 	payload := map[string]any{

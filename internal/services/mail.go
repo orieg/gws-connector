@@ -66,13 +66,13 @@ func (m *MailService) Search(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Found %d message(s) on %s (%s):\n\n", len(resp.Messages), acct.Label, acct.Email))
+	fmt.Fprintf(&sb, "Found %d message(s) on %s (%s):\n\n", len(resp.Messages), acct.Label, acct.Email)
 
 	for i, msg := range resp.Messages {
 		// Fetch message metadata
 		full, err := svc.Users.Messages.Get("me", msg.Id).Format("metadata").MetadataHeaders("From", "Subject", "Date").Do()
 		if err != nil {
-			sb.WriteString(fmt.Sprintf("%d. [Error fetching message %s]\n", i+1, msg.Id))
+			fmt.Fprintf(&sb, "%d. [Error fetching message %s]\n", i+1, msg.Id)
 			continue
 		}
 
@@ -88,8 +88,8 @@ func (m *MailService) Search(ctx context.Context, req mcp.CallToolRequest) (*mcp
 			}
 		}
 
-		sb.WriteString(fmt.Sprintf("%d. **%s**\n   From: %s\n   Date: %s\n   ID: %s | Thread: %s\n\n",
-			i+1, subject, from, date, msg.Id, msg.ThreadId))
+		fmt.Fprintf(&sb, "%d. **%s**\n   From: %s\n   Date: %s\n   ID: %s | Thread: %s\n\n",
+			i+1, subject, from, date, msg.Id, msg.ThreadId)
 	}
 
 	return TextResult(sb.String()), nil
@@ -139,9 +139,9 @@ func (m *MailService) ReadThread(ctx context.Context, req mcp.CallToolRequest) (
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Thread %s on %s (%s) — %d message(s):\n\n", threadId, acct.Label, acct.Email, len(thread.Messages)))
+	fmt.Fprintf(&sb, "Thread %s on %s (%s) — %d message(s):\n\n", threadId, acct.Label, acct.Email, len(thread.Messages))
 	for i, msg := range thread.Messages {
-		sb.WriteString(fmt.Sprintf("--- Message %d/%d ---\n", i+1, len(thread.Messages)))
+		fmt.Fprintf(&sb, "--- Message %d/%d ---\n", i+1, len(thread.Messages))
 		sb.WriteString(formatMessage(msg, acct, raw))
 		sb.WriteString("\n")
 	}
@@ -177,18 +177,18 @@ func (m *MailService) CreateDraft(ctx context.Context, req mcp.CallToolRequest) 
 	var raw strings.Builder
 	raw.WriteString("MIME-Version: 1.0\r\n")
 	if to != "" {
-		raw.WriteString(fmt.Sprintf("To: %s\r\n", to))
+		fmt.Fprintf(&raw, "To: %s\r\n", to)
 	}
 	if cc != "" {
-		raw.WriteString(fmt.Sprintf("Cc: %s\r\n", cc))
+		fmt.Fprintf(&raw, "Cc: %s\r\n", cc)
 	}
 	if bcc != "" {
-		raw.WriteString(fmt.Sprintf("Bcc: %s\r\n", bcc))
+		fmt.Fprintf(&raw, "Bcc: %s\r\n", bcc)
 	}
 	if subject != "" {
-		raw.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject)))
+		fmt.Fprintf(&raw, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject))
 	}
-	raw.WriteString(fmt.Sprintf("Content-Type: %s; charset=UTF-8\r\n", contentType))
+	fmt.Fprintf(&raw, "Content-Type: %s; charset=UTF-8\r\n", contentType)
 	raw.WriteString("Content-Transfer-Encoding: base64\r\n")
 	raw.WriteString("\r\n")
 	raw.WriteString(base64.StdEncoding.EncodeToString([]byte(body)))
@@ -295,14 +295,14 @@ func (m *MailService) Forward(ctx context.Context, req mcp.CallToolRequest) (*mc
 		body.WriteString("\n\n")
 	}
 	body.WriteString("---------- Forwarded message ---------\n")
-	body.WriteString(fmt.Sprintf("From: %s\n", origFrom))
-	body.WriteString(fmt.Sprintf("Date: %s\n", origDate))
-	body.WriteString(fmt.Sprintf("Subject: %s\n", origSubject))
-	body.WriteString(fmt.Sprintf("To: %s\n", origTo))
+	fmt.Fprintf(&body, "From: %s\n", origFrom)
+	fmt.Fprintf(&body, "Date: %s\n", origDate)
+	fmt.Fprintf(&body, "Subject: %s\n", origSubject)
+	fmt.Fprintf(&body, "To: %s\n", origTo)
 	if atts := collectAttachments(orig.Payload); len(atts) > 0 {
 		body.WriteString("Attachments (not re-attached — use mail.get_attachment):\n")
 		for _, a := range atts {
-			body.WriteString(fmt.Sprintf("  - %s (%s, %d bytes, attachmentId: %s)\n", a.Filename, a.MimeType, a.Size, a.AttachmentId))
+			fmt.Fprintf(&body, "  - %s (%s, %d bytes, attachmentId: %s)\n", a.Filename, a.MimeType, a.Size, a.AttachmentId)
 		}
 	}
 	body.WriteString("\n")
@@ -315,14 +315,14 @@ func (m *MailService) Forward(ctx context.Context, req mcp.CallToolRequest) (*mc
 	// Build RFC 2822 message (mirrors CreateDraft).
 	var rawMsg strings.Builder
 	rawMsg.WriteString("MIME-Version: 1.0\r\n")
-	rawMsg.WriteString(fmt.Sprintf("To: %s\r\n", to))
+	fmt.Fprintf(&rawMsg, "To: %s\r\n", to)
 	if cc != "" {
-		rawMsg.WriteString(fmt.Sprintf("Cc: %s\r\n", cc))
+		fmt.Fprintf(&rawMsg, "Cc: %s\r\n", cc)
 	}
 	if bcc != "" {
-		rawMsg.WriteString(fmt.Sprintf("Bcc: %s\r\n", bcc))
+		fmt.Fprintf(&rawMsg, "Bcc: %s\r\n", bcc)
 	}
-	rawMsg.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject)))
+	fmt.Fprintf(&rawMsg, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject))
 	rawMsg.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
 	rawMsg.WriteString("Content-Transfer-Encoding: base64\r\n")
 	rawMsg.WriteString("\r\n")
@@ -422,9 +422,9 @@ func (m *MailService) ListLabels(ctx context.Context, req mcp.CallToolRequest) (
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Labels on %s (%s):\n\n", acct.Label, acct.Email))
+	fmt.Fprintf(&sb, "Labels on %s (%s):\n\n", acct.Label, acct.Email)
 	for _, l := range resp.Labels {
-		sb.WriteString(fmt.Sprintf("- %s (ID: %s, type: %s)\n", l.Name, l.Id, l.Type))
+		fmt.Fprintf(&sb, "- %s (ID: %s, type: %s)\n", l.Name, l.Id, l.Type)
 	}
 
 	return TextResult(sb.String()), nil
@@ -550,15 +550,15 @@ func formatMessage(msg *gmail.Message, acct *accounts.Account, raw bool) string 
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf("Account: %s (%s)\n", acct.Label, acct.Email))
-	sb.WriteString(fmt.Sprintf("From: %s\nTo: %s\nSubject: %s\nDate: %s\n", from, to, subject, date))
-	sb.WriteString(fmt.Sprintf("ID: %s | Thread: %s\n", msg.Id, msg.ThreadId))
+	fmt.Fprintf(&sb, "Account: %s (%s)\n", acct.Label, acct.Email)
+	fmt.Fprintf(&sb, "From: %s\nTo: %s\nSubject: %s\nDate: %s\n", from, to, subject, date)
+	fmt.Fprintf(&sb, "ID: %s | Thread: %s\n", msg.Id, msg.ThreadId)
 
 	// Surface attachments so agents know what to fetch with mail.get_attachment.
 	if atts := collectAttachments(msg.Payload); len(atts) > 0 {
-		sb.WriteString(fmt.Sprintf("Attachments (%d):\n", len(atts)))
+		fmt.Fprintf(&sb, "Attachments (%d):\n", len(atts))
 		for _, a := range atts {
-			sb.WriteString(fmt.Sprintf("  - %s (%s, %d bytes) attachmentId: %s\n", a.Filename, a.MimeType, a.Size, a.AttachmentId))
+			fmt.Fprintf(&sb, "  - %s (%s, %d bytes) attachmentId: %s\n", a.Filename, a.MimeType, a.Size, a.AttachmentId)
 		}
 	}
 	sb.WriteString("\n")
