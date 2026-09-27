@@ -1,0 +1,32 @@
+name: Discipline
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  discipline:
+    name: Discipline / Change Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # merge base must be reachable
+
+      - name: Run discipline
+        uses: orieg/discipline@f251807952d0fb75e6b3a0a269edc96bf9a0d7b4 # v0.14.2
+        with:
+          # Judge the change with the base branch's discipline.toml, so a PR
+          # cannot loosen the policy that gates it.
+          policy_from: base
+          # Override directives are read only from the PR description.
+          directive_sources: pr-body
