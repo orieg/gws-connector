@@ -2,6 +2,7 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -80,12 +81,16 @@ func (ts *TokenStore) Load(email string) (*oauth2.Token, error) {
 // Delete removes a token for the given account email.
 func (ts *TokenStore) Delete(email string) error {
 	if !ts.useFileStorage {
-		keyring.Delete(keychainService, email)
+		if err := keyring.Delete(keychainService, email); err != nil && !errors.Is(err, keyring.ErrNotFound) {
+			log.Printf("gws-connector: failed to delete token from keychain for %s: %v", email, err)
+		}
 	}
 	// Also clean up any file storage
 	path := ts.tokenFilePath(email)
 	if _, err := os.Stat(path); err == nil {
-		os.Remove(path)
+		if err := os.Remove(path); err != nil {
+			return fmt.Errorf("removing token file for %s: %w", email, err)
+		}
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"html"
 	"net"
@@ -153,15 +154,13 @@ func StartOAuthFlow(clientID, clientSecret string) (*PendingFlow, error) {
 
 	stateBytes := make([]byte, 16)
 	if _, err := rand.Read(stateBytes); err != nil {
-		listener.Close()
-		return nil, fmt.Errorf("generating state: %w", err)
+		return nil, errors.Join(fmt.Errorf("generating state: %w", err), listener.Close())
 	}
 	state := hex.EncodeToString(stateBytes)
 
 	idBytes := make([]byte, 8)
 	if _, err := rand.Read(idBytes); err != nil {
-		listener.Close()
-		return nil, fmt.Errorf("generating id: %w", err)
+		return nil, errors.Join(fmt.Errorf("generating id: %w", err), listener.Close())
 	}
 
 	p := &PendingFlow{
@@ -218,7 +217,7 @@ func (p *PendingFlow) handleCallback(w http.ResponseWriter, r *http.Request) {
 		default:
 		}
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprint(w, oauthPageHTML("Authorization Failed", fmt.Sprintf("Error: %s", errMsg), true))
+		writeOAuthPage(w, oauthPageHTML("Authorization Failed", fmt.Sprintf("Error: %s", errMsg), true))
 		return
 	}
 	code := r.URL.Query().Get("code")
@@ -235,7 +234,7 @@ func (p *PendingFlow) handleCallback(w http.ResponseWriter, r *http.Request) {
 	default:
 	}
 	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprint(w, oauthPageHTML("Authorization Successful",
+	writeOAuthPage(w, oauthPageHTML("Authorization Successful",
 		"Your Google account has been connected. You can close this window and return to your editor.", false))
 }
 
@@ -349,6 +348,14 @@ func openBrowser(url string) error {
 		return exec.Command("cmd", "/c", "start", url).Start()
 	default:
 		return fmt.Errorf("unsupported OS %q for opening browser — open this URL manually", runtime.GOOS)
+	}
+}
+
+// writeOAuthPage sends the callback result page to the browser. The OAuth
+// outcome is already delivered on its channel, so a failed write is only logged.
+func writeOAuthPage(w http.ResponseWriter, page string) {
+	if _, err := fmt.Fprint(w, page); err != nil {
+		fmt.Fprintf(os.Stderr, "gws-connector: could not write OAuth result page: %v\n", err)
 	}
 }
 

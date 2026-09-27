@@ -9,7 +9,15 @@
   "repository": "https://github.com/orieg/gws-connector",
   "license": "MIT",
   "keywords": [
-    "gws", "mail", "calendar", "drive", "sheets", "docs", "workspace",
-    "multi-account", "oauth", "mcp"
+    "gws",
+    "mail",
+    "calendar",
+    "drive",
+    "sheets",
+    "docs",
+    "workspace",
+    "multi-account",
+    "oauth",
+    "mcp"
   ]
 }

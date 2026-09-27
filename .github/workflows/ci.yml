@@ -22,8 +22,8 @@ jobs:
       go: ${{ steps.filter.outputs.go }}
       ts: ${{ steps.filter.outputs.ts }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dorny/paths-filter@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -52,11 +52,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Go
         if: needs.detect-changes.outputs.go == 'true' || github.event_name != 'pull_request'
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -67,11 +66,10 @@ jobs:
 
       - name: golangci-lint
         if: needs.detect-changes.outputs.go == 'true' || github.event_name != 'pull_request'
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: latest
+          version: v2.14.0
           args: --timeout=5m
-        continue-on-error: true
 
       - name: ShellCheck
         run: |
@@ -83,20 +81,20 @@ jobs:
           fi
 
       - name: Setup Biome
-        uses: biomejs/setup-biome@v2
+        uses: biomejs/setup-biome@4c91541eaada48f67d7dbd7833600ce162b68f51 # v2.7.1
         with:
-          version: latest
+          version: 2.5.14
 
       - name: Run Biome Check
         run: |
-          biome check --files-ignore-unknown=true . || true
+          biome check --files-ignore-unknown=true .
 
   versions:
     name: Release Manifests / Version Consistency
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check manifest versions agree
         run: scripts/check-versions.sh
 
@@ -111,10 +109,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v7
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true

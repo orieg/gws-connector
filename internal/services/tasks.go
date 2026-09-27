@@ -64,9 +64,9 @@ func (t *TasksService) ListTasklists(ctx context.Context, req mcp.CallToolReques
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Task lists on %s (%s) — %d found:\n\n", acct.Label, acct.Email, len(resp.Items)))
+	fmt.Fprintf(&sb, "Task lists on %s (%s) — %d found:\n\n", acct.Label, acct.Email, len(resp.Items))
 	for i, tl := range resp.Items {
-		sb.WriteString(fmt.Sprintf("%d. %s\n   ID: %s\n\n", i+1, tl.Title, tl.Id))
+		fmt.Fprintf(&sb, "%d. %s\n   ID: %s\n\n", i+1, tl.Title, tl.Id)
 	}
 	return TextResult(sb.String()), nil
 }
@@ -99,24 +99,24 @@ func (t *TasksService) ListTasks(ctx context.Context, req mcp.CallToolRequest) (
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Tasks in list %q on %s (%s) — %d found:\n\n", tasklist, acct.Label, acct.Email, len(resp.Items)))
+	fmt.Fprintf(&sb, "Tasks in list %q on %s (%s) — %d found:\n\n", tasklist, acct.Label, acct.Email, len(resp.Items))
 	for i, task := range resp.Items {
 		status := task.Status
 		if status == "completed" {
 			status = "completed ✓"
 		}
-		sb.WriteString(fmt.Sprintf("%d. **%s** [%s]\n", i+1, task.Title, status))
+		fmt.Fprintf(&sb, "%d. **%s** [%s]\n", i+1, task.Title, status)
 		if task.Due != "" {
-			sb.WriteString(fmt.Sprintf("   Due: %s\n", task.Due))
+			fmt.Fprintf(&sb, "   Due: %s\n", task.Due)
 		}
 		if task.Notes != "" {
 			notes := task.Notes
 			if len(notes) > 200 {
 				notes = notes[:200] + "..."
 			}
-			sb.WriteString(fmt.Sprintf("   Notes: %s\n", notes))
+			fmt.Fprintf(&sb, "   Notes: %s\n", notes)
 		}
-		sb.WriteString(fmt.Sprintf("   ID: %s\n\n", task.Id))
+		fmt.Fprintf(&sb, "   ID: %s\n\n", task.Id)
 	}
 	return TextResult(sb.String()), nil
 }
@@ -151,13 +151,13 @@ func (t *TasksService) Create(ctx context.Context, req mcp.CallToolRequest) (*mc
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Task created on %s (%s):\n", acct.Label, acct.Email))
-	sb.WriteString(fmt.Sprintf("  Title: %s\n", created.Title))
+	fmt.Fprintf(&sb, "Task created on %s (%s):\n", acct.Label, acct.Email)
+	fmt.Fprintf(&sb, "  Title: %s\n", created.Title)
 	if created.Due != "" {
-		sb.WriteString(fmt.Sprintf("  Due: %s\n", created.Due))
+		fmt.Fprintf(&sb, "  Due: %s\n", created.Due)
 	}
-	sb.WriteString(fmt.Sprintf("  List: %s\n", tasklist))
-	sb.WriteString(fmt.Sprintf("  ID: %s\n", created.Id))
+	fmt.Fprintf(&sb, "  List: %s\n", tasklist)
+	fmt.Fprintf(&sb, "  ID: %s\n", created.Id)
 	return TextResult(sb.String()), nil
 }
 
