@@ -23,9 +23,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      # Pin to this release's commit SHA (`uses: orieg/discipline@<sha> # v0.14.1`):
-      # the default `ci-integrity` gate reports a tag ref as unpinned.
       - name: Install discipline for Copilot's hooks
-        uses: orieg/discipline@712239d775a189ce87a90ec9dd0395315146d5eb # v0.14.1
+        uses: orieg/discipline@f251807952d0fb75e6b3a0a269edc96bf9a0d7b4 # v0.14.2
         with:
           install_only: 'true'
