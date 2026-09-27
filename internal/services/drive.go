@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -12,6 +13,14 @@ import (
 	"github.com/orieg/gws-connector/internal/accounts"
 	"github.com/orieg/gws-connector/internal/auth"
 )
+
+// closeBody closes an export download. The content has already been read,
+// so a close error cannot change the result and is only logged.
+func closeBody(body io.Closer) {
+	if err := body.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "gws-connector: closing Drive export response: %v\n", err)
+	}
+}
 
 // DriveService implements Drive-related MCP tools.
 type DriveService struct {
@@ -68,18 +77,18 @@ func (d *DriveService) Search(ctx context.Context, req mcp.CallToolRequest) (*mc
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Files on %s (%s) — %d found:\n\n", acct.Label, acct.Email, len(resp.Files)))
+	fmt.Fprintf(&sb, "Files on %s (%s) — %d found:\n\n", acct.Label, acct.Email, len(resp.Files))
 
 	for i, f := range resp.Files {
-		sb.WriteString(fmt.Sprintf("%d. **%s**\n", i+1, f.Name))
-		sb.WriteString(fmt.Sprintf("   Type: %s\n", f.MimeType))
-		sb.WriteString(fmt.Sprintf("   Modified: %s\n", f.ModifiedTime))
+		fmt.Fprintf(&sb, "%d. **%s**\n", i+1, f.Name)
+		fmt.Fprintf(&sb, "   Type: %s\n", f.MimeType)
+		fmt.Fprintf(&sb, "   Modified: %s\n", f.ModifiedTime)
 		if f.Size > 0 {
-			sb.WriteString(fmt.Sprintf("   Size: %s\n", formatSize(f.Size)))
+			fmt.Fprintf(&sb, "   Size: %s\n", formatSize(f.Size))
 		}
-		sb.WriteString(fmt.Sprintf("   ID: %s\n", f.Id))
+		fmt.Fprintf(&sb, "   ID: %s\n", f.Id)
 		if f.WebViewLink != "" {
-			sb.WriteString(fmt.Sprintf("   Link: %s\n", f.WebViewLink))
+			fmt.Fprintf(&sb, "   Link: %s\n", f.WebViewLink)
 		}
 		sb.WriteString("\n")
 	}
@@ -116,7 +125,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 		if err != nil {
 			return ErrorResult(scopeOrErr(acct, "Drive", err, "exporting doc on %s: %w", acct.Label, err)), nil
 		}
-		defer resp.Body.Close()
+		defer closeBody(resp.Body)
 		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
 		if err != nil {
 			return ErrorResult(fmt.Errorf("reading doc export on %s: %w", acct.Label, err)), nil
@@ -128,7 +137,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 		if err != nil {
 			return ErrorResult(scopeOrErr(acct, "Drive", err, "exporting sheet on %s: %w", acct.Label, err)), nil
 		}
-		defer resp.Body.Close()
+		defer closeBody(resp.Body)
 		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
 		if err != nil {
 			return ErrorResult(fmt.Errorf("reading sheet export on %s: %w", acct.Label, err)), nil
@@ -140,7 +149,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 		if err != nil {
 			return ErrorResult(scopeOrErr(acct, "Drive", err, "exporting slides on %s: %w", acct.Label, err)), nil
 		}
-		defer resp.Body.Close()
+		defer closeBody(resp.Body)
 		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
 		if err != nil {
 			return ErrorResult(fmt.Errorf("reading slides export on %s: %w", acct.Label, err)), nil
@@ -153,7 +162,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 		if err != nil {
 			return ErrorResult(scopeOrErr(acct, "Drive", err, "downloading file on %s: %w", acct.Label, err)), nil
 		}
-		defer resp.Body.Close()
+		defer closeBody(resp.Body)
 		data, err := io.ReadAll(io.LimitReader(resp.Body, maxReadSize))
 		if err != nil {
 			return ErrorResult(fmt.Errorf("reading file on %s: %w", acct.Label, err)), nil
@@ -162,7 +171,7 @@ func (d *DriveService) ReadFile(ctx context.Context, req mcp.CallToolRequest) (*
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("File: %s\nType: %s\nAccount: %s (%s)\n\n", file.Name, file.MimeType, acct.Label, acct.Email))
+	fmt.Fprintf(&sb, "File: %s\nType: %s\nAccount: %s (%s)\n\n", file.Name, file.MimeType, acct.Label, acct.Email)
 	sb.WriteString(content)
 
 	return TextResult(sb.String()), nil
@@ -188,7 +197,7 @@ func (d *DriveService) ListFolder(ctx context.Context, req mcp.CallToolRequest) 
 	safeFolderId := "root"
 	if folderId != "" {
 		for _, c := range folderId {
-			if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+			if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '-' && c != '_' {
 				return ErrorResult(fmt.Errorf("invalid folderId: contains disallowed characters")), nil
 			}
 		}
@@ -212,15 +221,15 @@ func (d *DriveService) ListFolder(ctx context.Context, req mcp.CallToolRequest) 
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Files on %s (%s) — %d items:\n\n", acct.Label, acct.Email, len(resp.Files)))
+	fmt.Fprintf(&sb, "Files on %s (%s) — %d items:\n\n", acct.Label, acct.Email, len(resp.Files))
 
 	for i, f := range resp.Files {
 		icon := "  "
 		if strings.Contains(f.MimeType, "folder") {
 			icon = "[folder] "
 		}
-		sb.WriteString(fmt.Sprintf("%d. %s%s\n", i+1, icon, f.Name))
-		sb.WriteString(fmt.Sprintf("   Type: %s | Modified: %s | ID: %s\n", f.MimeType, f.ModifiedTime, f.Id))
+		fmt.Fprintf(&sb, "%d. %s%s\n", i+1, icon, f.Name)
+		fmt.Fprintf(&sb, "   Type: %s | Modified: %s | ID: %s\n", f.MimeType, f.ModifiedTime, f.Id)
 	}
 
 	return TextResult(sb.String()), nil

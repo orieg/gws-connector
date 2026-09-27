@@ -80,7 +80,7 @@ func (c *CalendarService) ListEvents(ctx context.Context, req mcp.CallToolReques
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Events on %s (%s) — %d found:\n\n", acct.Label, acct.Email, len(resp.Items)))
+	fmt.Fprintf(&sb, "Events on %s (%s) — %d found:\n\n", acct.Label, acct.Email, len(resp.Items))
 
 	for i, event := range resp.Items {
 		start := event.Start.DateTime
@@ -92,19 +92,19 @@ func (c *CalendarService) ListEvents(ctx context.Context, req mcp.CallToolReques
 			end = event.End.Date
 		}
 
-		sb.WriteString(fmt.Sprintf("%d. **%s**\n", i+1, event.Summary))
-		sb.WriteString(fmt.Sprintf("   Start: %s\n   End: %s\n", start, end))
+		fmt.Fprintf(&sb, "%d. **%s**\n", i+1, event.Summary)
+		fmt.Fprintf(&sb, "   Start: %s\n   End: %s\n", start, end)
 		if event.Location != "" {
-			sb.WriteString(fmt.Sprintf("   Location: %s\n", event.Location))
+			fmt.Fprintf(&sb, "   Location: %s\n", event.Location)
 		}
 		if event.Description != "" {
 			desc := event.Description
 			if len(desc) > 200 {
 				desc = desc[:200] + "..."
 			}
-			sb.WriteString(fmt.Sprintf("   Description: %s\n", desc))
+			fmt.Fprintf(&sb, "   Description: %s\n", desc)
 		}
-		sb.WriteString(fmt.Sprintf("   ID: %s\n\n", event.Id))
+		fmt.Fprintf(&sb, "   ID: %s\n\n", event.Id)
 	}
 
 	return TextResult(sb.String()), nil
@@ -308,26 +308,26 @@ func (c *CalendarService) FreeBusy(ctx context.Context, req mcp.CallToolRequest)
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Free/busy on %s (%s) from %s to %s:\n\n", acct.Label, acct.Email, timeMin, timeMax))
+	fmt.Fprintf(&sb, "Free/busy on %s (%s) from %s to %s:\n\n", acct.Label, acct.Email, timeMin, timeMax)
 	for _, id := range calendarIds {
 		cal, ok := resp.Calendars[id]
-		sb.WriteString(fmt.Sprintf("Calendar: %s\n", id))
+		fmt.Fprintf(&sb, "Calendar: %s\n", id)
 		if !ok {
 			sb.WriteString("  (no data returned)\n\n")
 			continue
 		}
 		if len(cal.Errors) > 0 {
 			for _, e := range cal.Errors {
-				sb.WriteString(fmt.Sprintf("  Error: %s\n", e.Reason))
+				fmt.Fprintf(&sb, "  Error: %s\n", e.Reason)
 			}
 		}
 		if len(cal.Busy) == 0 {
 			sb.WriteString("  Free for the entire range.\n\n")
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("  Busy (%d):\n", len(cal.Busy)))
+		fmt.Fprintf(&sb, "  Busy (%d):\n", len(cal.Busy))
 		for _, b := range cal.Busy {
-			sb.WriteString(fmt.Sprintf("    %s → %s\n", b.Start, b.End))
+			fmt.Fprintf(&sb, "    %s → %s\n", b.Start, b.End)
 		}
 		sb.WriteString("\n")
 	}
@@ -348,14 +348,14 @@ func (c *CalendarService) ListCalendars(ctx context.Context, req mcp.CallToolReq
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Calendars on %s (%s):\n\n", acct.Label, acct.Email))
+	fmt.Fprintf(&sb, "Calendars on %s (%s):\n\n", acct.Label, acct.Email)
 	for i, cal := range resp.Items {
 		primary := ""
 		if cal.Primary {
 			primary = " [PRIMARY]"
 		}
-		sb.WriteString(fmt.Sprintf("%d. %s%s\n   ID: %s\n   Access: %s\n\n",
-			i+1, cal.Summary, primary, cal.Id, cal.AccessRole))
+		fmt.Fprintf(&sb, "%d. %s%s\n   ID: %s\n   Access: %s\n\n",
+			i+1, cal.Summary, primary, cal.Id, cal.AccessRole)
 	}
 
 	return TextResult(sb.String()), nil
@@ -373,29 +373,29 @@ func formatEvent(event *calendar.Event, acct *accounts.Account) string {
 		end = event.End.Date
 	}
 
-	sb.WriteString(fmt.Sprintf("Account: %s (%s)\n", acct.Label, acct.Email))
-	sb.WriteString(fmt.Sprintf("Title: %s\n", event.Summary))
-	sb.WriteString(fmt.Sprintf("Start: %s\nEnd: %s\n", start, end))
+	fmt.Fprintf(&sb, "Account: %s (%s)\n", acct.Label, acct.Email)
+	fmt.Fprintf(&sb, "Title: %s\n", event.Summary)
+	fmt.Fprintf(&sb, "Start: %s\nEnd: %s\n", start, end)
 	if event.Location != "" {
-		sb.WriteString(fmt.Sprintf("Location: %s\n", event.Location))
+		fmt.Fprintf(&sb, "Location: %s\n", event.Location)
 	}
 	if event.Description != "" {
-		sb.WriteString(fmt.Sprintf("Description: %s\n", event.Description))
+		fmt.Fprintf(&sb, "Description: %s\n", event.Description)
 	}
-	sb.WriteString(fmt.Sprintf("Status: %s\n", event.Status))
-	sb.WriteString(fmt.Sprintf("ID: %s\n", event.Id))
+	fmt.Fprintf(&sb, "Status: %s\n", event.Status)
+	fmt.Fprintf(&sb, "ID: %s\n", event.Id)
 	if event.HtmlLink != "" {
-		sb.WriteString(fmt.Sprintf("Link: %s\n", event.HtmlLink))
+		fmt.Fprintf(&sb, "Link: %s\n", event.HtmlLink)
 	}
 
 	if len(event.Attendees) > 0 {
-		sb.WriteString(fmt.Sprintf("\nAttendees (%d):\n", len(event.Attendees)))
+		fmt.Fprintf(&sb, "\nAttendees (%d):\n", len(event.Attendees))
 		for _, a := range event.Attendees {
 			name := a.DisplayName
 			if name == "" {
 				name = a.Email
 			}
-			sb.WriteString(fmt.Sprintf("  - %s (%s)\n", name, a.ResponseStatus))
+			fmt.Fprintf(&sb, "  - %s (%s)\n", name, a.ResponseStatus)
 		}
 	}
 

@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -63,7 +65,9 @@ func TestDeleteToken(t *testing.T) {
 		AccessToken:  "access-123",
 		RefreshToken: "refresh-456",
 	}
-	ts.Save("alice@example.com", token)
+	if err := ts.Save("alice@example.com", token); err != nil {
+		t.Fatalf("ts.Save: %v", err)
+	}
 
 	err := ts.Delete("alice@example.com")
 	if err != nil {
@@ -82,8 +86,12 @@ func TestMultipleAccountTokens(t *testing.T) {
 	token1 := &oauth2.Token{AccessToken: "alice-token"}
 	token2 := &oauth2.Token{AccessToken: "bob-token"}
 
-	ts.Save("alice@example.com", token1)
-	ts.Save("bob@work.com", token2)
+	if err := ts.Save("alice@example.com", token1); err != nil {
+		t.Fatalf("ts.Save: %v", err)
+	}
+	if err := ts.Save("bob@work.com", token2); err != nil {
+		t.Fatalf("ts.Save: %v", err)
+	}
 
 	loaded1, _ := ts.Load("alice@example.com")
 	loaded2, _ := ts.Load("bob@work.com")
@@ -119,8 +127,12 @@ func TestOverwriteToken(t *testing.T) {
 	token1 := &oauth2.Token{AccessToken: "old-token"}
 	token2 := &oauth2.Token{AccessToken: "new-token"}
 
-	ts.Save("alice@example.com", token1)
-	ts.Save("alice@example.com", token2)
+	if err := ts.Save("alice@example.com", token1); err != nil {
+		t.Fatalf("ts.Save: %v", err)
+	}
+	if err := ts.Save("alice@example.com", token2); err != nil {
+		t.Fatalf("ts.Save: %v", err)
+	}
 
 	loaded, _ := ts.Load("alice@example.com")
 	if loaded.AccessToken != "new-token" {
@@ -134,5 +146,28 @@ func TestDeleteNonexistentTokenNoError(t *testing.T) {
 	err := ts.Delete("nobody@example.com")
 	if err != nil {
 		t.Errorf("Delete() should not error for nonexistent token: %v", err)
+	}
+}
+
+func TestDeleteReportsTokenFileRemovalFailure(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not prevent removal here")
+	}
+	ts := newFileTokenStore(t)
+	if err := ts.Save("alice@example.com", &oauth2.Token{AccessToken: "a"}); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	dir := ts.tokenDir()
+	if err := os.Chmod(dir, 0500); err != nil {
+		t.Fatalf("chmod: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0700) })
+
+	if err := ts.Delete("alice@example.com"); err == nil {
+		t.Fatal("Delete() should report a token file it could not remove")
+	}
+	if _, err := os.Stat(ts.tokenFilePath("alice@example.com")); err != nil {
+		t.Errorf("token file should still exist after a failed delete: %v", err)
 	}
 }

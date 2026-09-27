@@ -152,14 +152,14 @@ func (s *SheetsService) ReadRange(ctx context.Context, req mcp.CallToolRequest) 
 
 	// Build the untrusted-fenced text summary.
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Read %d row(s) from %s on %s (%s).",
-		len(rows), resp.Range, acct.Label, acct.Email))
+	fmt.Fprintf(&sb, "Read %d row(s) from %s on %s (%s).",
+		len(rows), resp.Range, acct.Label, acct.Email)
 	if truncated {
-		sb.WriteString(fmt.Sprintf(" Truncated from %d total rows (max_rows=%d).", totalRows, maxRows))
+		fmt.Fprintf(&sb, " Truncated from %d total rows (max_rows=%d).", totalRows, maxRows)
 	}
 	sb.WriteString("\n\n")
-	sb.WriteString(fmt.Sprintf("<untrusted-document-content account=%q source=\"sheets/%s\" range=%q>\n",
-		acct.Label, spreadsheetID, resp.Range))
+	fmt.Fprintf(&sb, "<untrusted-document-content account=%q source=\"sheets/%s\" range=%q>\n",
+		acct.Label, spreadsheetID, resp.Range)
 	sb.WriteString(renderCellGrid(rows))
 	sb.WriteString("\n</untrusted-document-content>")
 
@@ -399,16 +399,14 @@ func (s *SheetsService) Create(ctx context.Context, req mcp.CallToolRequest) (*m
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(
-		"Created spreadsheet %q on %s (%s).\n  ID: %s\n  URL: %s",
+	fmt.Fprintf(&sb, "Created spreadsheet %q on %s (%s).\n  ID: %s\n  URL: %s",
 		created.Properties.Title, acct.Label, acct.Email,
-		created.SpreadsheetId, created.SpreadsheetUrl))
+		created.SpreadsheetId, created.SpreadsheetUrl)
 	if seededRange != "" && seedErr == nil {
-		sb.WriteString(fmt.Sprintf("\n  Seeded initial values at %s", seededRange))
+		fmt.Fprintf(&sb, "\n  Seeded initial values at %s", seededRange)
 	}
 	if seedErr != nil {
-		sb.WriteString(fmt.Sprintf(
-			"\n  WARNING: spreadsheet created but initial_values write failed: %v", seedErr))
+		fmt.Fprintf(&sb, "\n  WARNING: spreadsheet created but initial_values write failed: %v", seedErr)
 	}
 
 	payload := map[string]any{
@@ -455,10 +453,9 @@ func (s *SheetsService) ListTabs(ctx context.Context, req mcp.CallToolRequest) (
 	if ss.Properties != nil {
 		ssTitle = ss.Properties.Title
 	}
-	sb.WriteString(fmt.Sprintf(
-		"Spreadsheet %q on %s (%s) has %d tab(s):\n\n",
-		ssTitle, acct.Label, acct.Email, len(ss.Sheets)))
-	sb.WriteString(fmt.Sprintf("<untrusted-document-content account=%q source=\"sheets/%s\">\n", acct.Label, spreadsheetID))
+	fmt.Fprintf(&sb, "Spreadsheet %q on %s (%s) has %d tab(s):\n\n",
+		ssTitle, acct.Label, acct.Email, len(ss.Sheets))
+	fmt.Fprintf(&sb, "<untrusted-document-content account=%q source=\"sheets/%s\">\n", acct.Label, spreadsheetID)
 	for i, sh := range ss.Sheets {
 		p := sh.Properties
 		if p == nil {
@@ -473,7 +470,7 @@ func (s *SheetsService) ListTabs(ctx context.Context, req mcp.CallToolRequest) (
 			Title: p.Title, SheetID: p.SheetId, Index: p.Index,
 			RowCount: rows, ColumnCount: cols,
 		})
-		sb.WriteString(fmt.Sprintf("%d. %s (id=%d, %dx%d)\n", i+1, p.Title, p.SheetId, rows, cols))
+		fmt.Fprintf(&sb, "%d. %s (id=%d, %dx%d)\n", i+1, p.Title, p.SheetId, rows, cols)
 	}
 	sb.WriteString("</untrusted-document-content>")
 

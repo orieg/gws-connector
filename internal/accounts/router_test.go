@@ -8,9 +8,15 @@ import (
 func setupRouter(t *testing.T) (*Router, *Store) {
 	t.Helper()
 	store := tempStore(t)
-	store.Add("alice@example.com", "personal", "Alice", "")
-	store.Add("bob@work.com", "work", "Bob", "")
-	store.SetDefault("personal")
+	if err := store.Add("alice@example.com", "personal", "Alice", ""); err != nil {
+		t.Fatalf("store.Add: %v", err)
+	}
+	if err := store.Add("bob@work.com", "work", "Bob", ""); err != nil {
+		t.Fatalf("store.Add: %v", err)
+	}
+	if err := store.SetDefault("personal"); err != nil {
+		t.Fatalf("store.SetDefault: %v", err)
+	}
 	return NewRouter(store), store
 }
 
@@ -148,7 +154,9 @@ func TestListAccountsEmpty(t *testing.T) {
 func TestResolveAfterDefaultChange(t *testing.T) {
 	router, store := setupRouter(t)
 
-	store.SetDefault("work")
+	if err := store.SetDefault("work"); err != nil {
+		t.Fatalf("store.SetDefault: %v", err)
+	}
 
 	acct, err := router.Resolve("")
 	if err != nil {

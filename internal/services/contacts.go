@@ -79,10 +79,10 @@ func (c *ContactsService) Search(ctx context.Context, req mcp.CallToolRequest) (
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Contacts on %s (%s) matching %q — %d found:\n\n",
-		acct.Label, acct.Email, query, len(resp.Results)))
+	fmt.Fprintf(&sb, "Contacts on %s (%s) matching %q — %d found:\n\n",
+		acct.Label, acct.Email, query, len(resp.Results))
 	for i, r := range resp.Results {
-		sb.WriteString(fmt.Sprintf("%d. %s", i+1, formatPerson(r.Person)))
+		fmt.Fprintf(&sb, "%d. %s", i+1, formatPerson(r.Person))
 	}
 
 	return TextResult(sb.String()), nil
@@ -133,10 +133,10 @@ func (c *ContactsService) DirectorySearch(ctx context.Context, req mcp.CallToolR
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Directory results on %s (%s) matching %q — %d found:\n\n",
-		acct.Label, acct.Email, query, len(resp.People)))
+	fmt.Fprintf(&sb, "Directory results on %s (%s) matching %q — %d found:\n\n",
+		acct.Label, acct.Email, query, len(resp.People))
 	for i, p := range resp.People {
-		sb.WriteString(fmt.Sprintf("%d. %s", i+1, formatPerson(p)))
+		fmt.Fprintf(&sb, "%d. %s", i+1, formatPerson(p))
 	}
 
 	return TextResult(sb.String()), nil
@@ -169,7 +169,7 @@ func formatPerson(p *people.Person) string {
 			}
 		}
 		if len(emails) > 0 {
-			sb.WriteString(fmt.Sprintf("   Emails: %s\n", strings.Join(emails, ", ")))
+			fmt.Fprintf(&sb, "   Emails: %s\n", strings.Join(emails, ", "))
 		}
 	}
 
@@ -181,7 +181,7 @@ func formatPerson(p *people.Person) string {
 			}
 		}
 		if len(phones) > 0 {
-			sb.WriteString(fmt.Sprintf("   Phones: %s\n", strings.Join(phones, ", ")))
+			fmt.Fprintf(&sb, "   Phones: %s\n", strings.Join(phones, ", "))
 		}
 	}
 

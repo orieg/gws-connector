@@ -58,15 +58,13 @@ func (s *SlidesService) Get(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 
 	slideSummaries := make([]map[string]any, 0, len(pres.Slides))
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf(
-		"Read presentation %q on %s (%s).\n  ID: %s\n  Slides: %d\n\n",
-		pres.Title, acct.Label, acct.Email, pres.PresentationId, len(pres.Slides)))
-	sb.WriteString(fmt.Sprintf(
-		"<untrusted-document-content account=%q source=\"slides/%s\">\n",
-		acct.Label, presentationID))
+	fmt.Fprintf(&sb, "Read presentation %q on %s (%s).\n  ID: %s\n  Slides: %d\n\n",
+		pres.Title, acct.Label, acct.Email, pres.PresentationId, len(pres.Slides))
+	fmt.Fprintf(&sb, "<untrusted-document-content account=%q source=\"slides/%s\">\n",
+		acct.Label, presentationID)
 	for i, slide := range pres.Slides {
 		text := extractSlideText(slide)
-		sb.WriteString(fmt.Sprintf("--- Slide %d/%d (id: %s) ---\n", i+1, len(pres.Slides), slide.ObjectId))
+		fmt.Fprintf(&sb, "--- Slide %d/%d (id: %s) ---\n", i+1, len(pres.Slides), slide.ObjectId)
 		if text != "" {
 			sb.WriteString(text)
 			sb.WriteString("\n")

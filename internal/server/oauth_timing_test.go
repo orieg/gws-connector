@@ -22,7 +22,9 @@ func TestReauthReturnsQuicklyNotBlocking(t *testing.T) {
 	defer restore()
 
 	s := testServer(t)
-	s.accountStore.Add("alice@example.com", "personal", "Alice", "")
+	if err := s.accountStore.Add("alice@example.com", "personal", "Alice", ""); err != nil {
+		t.Fatalf("s.accountStore.Add: %v", err)
+	}
 	if err := s.tokenStore.SaveClientSecret("alice@example.com", "account-secret"); err != nil {
 		t.Fatalf("save client secret: %v", err)
 	}
@@ -66,7 +68,9 @@ func TestCompleteIsBounded(t *testing.T) {
 	defer restore()
 
 	s := testServer(t)
-	s.accountStore.Add("alice@example.com", "personal", "Alice", "")
+	if err := s.accountStore.Add("alice@example.com", "personal", "Alice", ""); err != nil {
+		t.Fatalf("s.accountStore.Add: %v", err)
+	}
 	if err := s.tokenStore.SaveClientSecret("alice@example.com", "account-secret"); err != nil {
 		t.Fatalf("save client secret: %v", err)
 	}
@@ -112,7 +116,9 @@ func TestConcurrentCallsDontBlockEachOther(t *testing.T) {
 	defer restore()
 
 	s := testServer(t)
-	s.accountStore.Add("alice@example.com", "personal", "Alice", "")
+	if err := s.accountStore.Add("alice@example.com", "personal", "Alice", ""); err != nil {
+		t.Fatalf("s.accountStore.Add: %v", err)
+	}
 	if err := s.tokenStore.SaveClientSecret("alice@example.com", "account-secret"); err != nil {
 		t.Fatalf("save client secret: %v", err)
 	}
@@ -128,7 +134,7 @@ func TestConcurrentCallsDontBlockEachOther(t *testing.T) {
 		req := mcp.CallToolRequest{}
 		req.Params.Arguments = map[string]any{"account": "personal"}
 		start := time.Now()
-		s.handleAccountsReauth(context.Background(), req)
+		_, _ = s.handleAccountsReauth(context.Background(), req)
 		reauthElapsed = time.Since(start)
 	}()
 
@@ -141,7 +147,7 @@ func TestConcurrentCallsDontBlockEachOther(t *testing.T) {
 		req := mcp.CallToolRequest{}
 		req.Params.Arguments = map[string]any{}
 		start := time.Now()
-		s.handleAccountsList(context.Background(), req)
+		_, _ = s.handleAccountsList(context.Background(), req)
 		listElapsed = time.Since(start)
 	}()
 

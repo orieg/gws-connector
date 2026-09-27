@@ -24,7 +24,9 @@ func TestCredentialsForAccountUsesPerAccount(t *testing.T) {
 		},
 	}
 	// Store client secret in token store (keychain/file)
-	ts.SaveClientSecret("bob@corp.com", "corp-secret")
+	if err := ts.SaveClientSecret("bob@corp.com", "corp-secret"); err != nil {
+		t.Fatalf("ts.SaveClientSecret: %v", err)
+	}
 
 	factory := NewClientFactory(ts, "global-id", "global-secret", creds)
 
@@ -84,8 +86,12 @@ func TestCredentialsMultipleAccounts(t *testing.T) {
 			"bob@corpB.com":   "corpB-id",
 		},
 	}
-	ts.SaveClientSecret("alice@corpA.com", "corpA-secret")
-	ts.SaveClientSecret("bob@corpB.com", "corpB-secret")
+	if err := ts.SaveClientSecret("alice@corpA.com", "corpA-secret"); err != nil {
+		t.Fatalf("ts.SaveClientSecret: %v", err)
+	}
+	if err := ts.SaveClientSecret("bob@corpB.com", "corpB-secret"); err != nil {
+		t.Fatalf("ts.SaveClientSecret: %v", err)
+	}
 
 	factory := NewClientFactory(ts, "global-id", "global-secret", creds)
 
