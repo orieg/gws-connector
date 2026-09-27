@@ -21,9 +21,26 @@
       "homepage": "https://github.com/orieg/gws-connector",
       "repository": "https://github.com/orieg/gws-connector",
       "license": "MIT",
-      "keywords": ["gmail", "calendar", "drive", "sheets", "docs", "google-workspace", "multi-account", "mcp"],
+      "keywords": [
+        "gmail",
+        "calendar",
+        "drive",
+        "sheets",
+        "docs",
+        "google-workspace",
+        "multi-account",
+        "mcp"
+      ],
       "category": "productivity",
-      "tags": ["email", "calendar", "drive", "sheets", "docs", "google", "workspace"]
+      "tags": [
+        "email",
+        "calendar",
+        "drive",
+        "sheets",
+        "docs",
+        "google",
+        "workspace"
+      ]
     }
   ]
 }
