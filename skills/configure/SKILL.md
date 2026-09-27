@@ -21,7 +21,7 @@ If no credentials are configured (the tool returns an error about missing creden
 
 Tell the user:
 
-> To connect Google accounts, you need OAuth credentials from a Google Cloud project. Here's how to set them up (one-time, ~5 minutes):
+> To connect Google accounts, you need OAuth credentials from a Google Cloud project. Here's how to set them up (one-time):
 >
 > **1. Go to the Google Cloud Console:**
 >    https://console.cloud.google.com/

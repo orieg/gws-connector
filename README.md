@@ -137,7 +137,7 @@ or the consent screen will reject the request.
 /gws:configure
 ```
 
-This creates a GCP project, enables APIs, and connects your first account (~5 minutes). See [Google Cloud Setup](#google-cloud-setup) if you prefer manual steps.
+This creates a GCP project, enables APIs, and connects your first account. See [Google Cloud Setup](#google-cloud-setup) if you prefer manual steps.
 
 **3. Connect additional accounts:**
 
@@ -359,7 +359,7 @@ Tips:
 
 ## Google Cloud Setup
 
-One-time setup (~5 minutes):
+One-time setup:
 
 1. **Go to [Google Cloud Console](https://console.cloud.google.com/)** and create a new project (e.g., "GWS Connector")
 
