@@ -3,7 +3,7 @@ module github.com/orieg/gws-connector
 go 1.26.0
 
 require (
-	github.com/mark3labs/mcp-go v1.1.0
+	github.com/mark3labs/mcp-go v1.1.1
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/oauth2 v0.37.0
 	google.golang.org/api v0.299.0
