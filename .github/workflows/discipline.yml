@@ -23,7 +23,7 @@ jobs:
           fetch-depth: 0 # merge base must be reachable
 
       - name: Run discipline
-        uses: orieg/discipline@410daf24d6bedc10b5ef8137de6ccb2dace767b4 # v0.14.4
+        uses: orieg/discipline@7afe678f2868f44ca036de79d33ef6560f87d48b # v0.15.0
         with:
           # Judge the change with the base branch's discipline.toml, so a PR
           # cannot loosen the policy that gates it.
