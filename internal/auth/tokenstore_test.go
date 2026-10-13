@@ -171,3 +171,16 @@ func TestDeleteReportsTokenFileRemovalFailure(t *testing.T) {
 		t.Errorf("token file should still exist after a failed delete: %v", err)
 	}
 }
+
+// Instances started at the same moment must not share a probe key, or one
+// deletes the other's probe and that instance falls back to file storage.
+func TestProbeKeyIsUniquePerCall(t *testing.T) {
+	seen := map[string]bool{}
+	for i := 0; i < 100; i++ {
+		k := probeKey()
+		if seen[k] {
+			t.Fatalf("probeKey returned duplicate %q", k)
+		}
+		seen[k] = true
+	}
+}

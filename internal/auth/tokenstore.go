@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,19 +28,31 @@ type TokenStore struct {
 func NewTokenStore(stateDir string) *TokenStore {
 	ts := &TokenStore{stateDir: stateDir}
 
-	// Test keychain availability with a probe
-	testKey := "__gws_keychain_test__"
+	// Test keychain availability with a probe. The key is unique per process:
+	// MCP hosts can start several server instances at once, and with a shared
+	// key one instance deletes the other's probe, which then looks like a
+	// broken keychain and silently strands that instance on file storage.
+	testKey := probeKey()
 	err := keyring.Set(keychainService, testKey, "test")
 	if err != nil {
+		log.Printf("warning: keychain probe failed: %v (falling back to file storage)", err)
 		ts.useFileStorage = true
 	} else {
-		if delErr := keyring.Delete(keychainService, testKey); delErr != nil {
+		if delErr := keyring.Delete(keychainService, testKey); delErr != nil && !errors.Is(delErr, keyring.ErrNotFound) {
 			log.Printf("warning: keychain probe cleanup failed: %v (falling back to file storage)", delErr)
 			ts.useFileStorage = true
 		}
 	}
 
 	return ts
+}
+
+// probeKey returns a keychain key for the availability probe that no other
+// running instance will use.
+func probeKey() string {
+	var b [8]byte
+	_, _ = rand.Read(b[:])
+	return fmt.Sprintf("__gws_keychain_test_%d_%s__", os.Getpid(), hex.EncodeToString(b[:]))
 }
 
 // Save stores a token for the given account email.
