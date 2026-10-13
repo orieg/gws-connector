@@ -198,6 +198,47 @@ func TestHandleAccountsSetDefaultSuccess(t *testing.T) {
 	}
 }
 
+func TestHandleAccountsRenameSuccess(t *testing.T) {
+	s := testServer(t)
+	if err := s.accountStore.Add("alice@example.com", "personal", "Alice", ""); err != nil {
+		t.Fatalf("s.accountStore.Add: %v", err)
+	}
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"account": "personal", "label": "home"}
+
+	result, _ := s.handleAccountsRename(context.Background(), req)
+	if result.IsError {
+		t.Fatalf("unexpected error: %s", extractText(result))
+	}
+	if got := extractText(result); !strings.Contains(got, "'personal' to 'home'") {
+		t.Errorf("reply should name old and new label, got %q", got)
+	}
+
+	acct, err := s.accountRouter.Resolve("home")
+	if err != nil || acct.Email != "alice@example.com" {
+		t.Errorf("new label should resolve to alice, got %+v, %v", acct, err)
+	}
+}
+
+func TestHandleAccountsRenameLabelInUse(t *testing.T) {
+	s := testServer(t)
+	if err := s.accountStore.Add("alice@example.com", "personal", "Alice", ""); err != nil {
+		t.Fatalf("s.accountStore.Add: %v", err)
+	}
+	if err := s.accountStore.Add("bob@work.com", "work", "Bob", ""); err != nil {
+		t.Fatalf("s.accountStore.Add: %v", err)
+	}
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]any{"account": "work", "label": "personal"}
+
+	result, _ := s.handleAccountsRename(context.Background(), req)
+	if !result.IsError {
+		t.Error("expected an error when the label is already in use")
+	}
+}
+
 func TestToolNamingDotNames(t *testing.T) {
 	s := testServer(t)
 	name := s.toolName("gws", "mail", "search")
@@ -230,6 +271,7 @@ func TestAllToolsRegistered(t *testing.T) {
 		"gws.accounts.complete",
 		"gws.accounts.remove",
 		"gws.accounts.set_default",
+		"gws.accounts.rename",
 		// Mail
 		"gws.mail.search",
 		"gws.mail.read_message",

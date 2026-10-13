@@ -276,6 +276,73 @@ func TestSetDefaultNotFound(t *testing.T) {
 	}
 }
 
+func TestRename(t *testing.T) {
+	store := tempStore(t)
+	if err := store.Add("alice@example.com", "personal", "Alice", ""); err != nil {
+		t.Fatalf("store.Add: %v", err)
+	}
+	if err := store.Add("bob@work.com", "work", "Bob", ""); err != nil {
+		t.Fatalf("store.Add: %v", err)
+	}
+
+	if err := store.Rename("work", "  Client Acme "); err != nil {
+		t.Fatalf("Rename() error: %v", err)
+	}
+
+	reg, _ := store.Load()
+	if reg.Accounts[1].Label != "Client Acme" {
+		t.Errorf("expected label 'Client Acme', got %q", reg.Accounts[1].Label)
+	}
+	if reg.Accounts[1].Email != "bob@work.com" {
+		t.Errorf("email should be unchanged, got %q", reg.Accounts[1].Email)
+	}
+	if !reg.Accounts[0].Default || reg.Accounts[1].Default {
+		t.Error("default account should be unchanged")
+	}
+}
+
+func TestRenameByEmailAndCaseOnly(t *testing.T) {
+	store := tempStore(t)
+	if err := store.Add("alice@example.com", "personal", "Alice", ""); err != nil {
+		t.Fatalf("store.Add: %v", err)
+	}
+
+	// Changing only the case of an account's own label is not a conflict.
+	if err := store.Rename("alice@example.com", "Personal"); err != nil {
+		t.Fatalf("Rename() error: %v", err)
+	}
+
+	reg, _ := store.Load()
+	if reg.Accounts[0].Label != "Personal" {
+		t.Errorf("expected label 'Personal', got %q", reg.Accounts[0].Label)
+	}
+}
+
+func TestRenameErrors(t *testing.T) {
+	store := tempStore(t)
+	if err := store.Add("alice@example.com", "personal", "Alice", ""); err != nil {
+		t.Fatalf("store.Add: %v", err)
+	}
+	if err := store.Add("bob@work.com", "work", "Bob", ""); err != nil {
+		t.Fatalf("store.Add: %v", err)
+	}
+
+	if err := store.Rename("nonexistent", "x"); err != ErrAccountNotFound {
+		t.Errorf("expected ErrAccountNotFound, got %v", err)
+	}
+	if err := store.Rename("work", "PERSONAL"); err != ErrLabelInUse {
+		t.Errorf("expected ErrLabelInUse, got %v", err)
+	}
+	if err := store.Rename("work", "   "); err != ErrEmptyLabel {
+		t.Errorf("expected ErrEmptyLabel, got %v", err)
+	}
+
+	reg, _ := store.Load()
+	if reg.Accounts[1].Label != "work" {
+		t.Errorf("label should be unchanged after failed renames, got %q", reg.Accounts[1].Label)
+	}
+}
+
 func TestGetDefault(t *testing.T) {
 	store := tempStore(t)
 	if err := store.Add("alice@example.com", "personal", "Alice", ""); err != nil {
