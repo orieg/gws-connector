@@ -15,6 +15,7 @@ var (
 	ErrAccountExists   = errors.New("account already exists")
 	ErrNoAccounts      = errors.New("no accounts configured")
 	ErrLabelInUse      = errors.New("label already in use")
+	ErrEmptyLabel      = errors.New("label must not be empty")
 )
 
 // Store manages the accounts.json registry file.
@@ -166,6 +167,41 @@ func (s *Store) SetDefault(identifier string) error {
 		return ErrAccountNotFound
 	}
 
+	return s.Save(reg)
+}
+
+// Rename changes an account's label. The account is identified by email or
+// current label. Tokens and client secrets are keyed by email, so they are
+// unaffected.
+func (s *Store) Rename(identifier, newLabel string) error {
+	newLabel = strings.TrimSpace(newLabel)
+	if newLabel == "" {
+		return ErrEmptyLabel
+	}
+
+	reg, err := s.Load()
+	if err != nil {
+		return err
+	}
+
+	idx := -1
+	for i, a := range reg.Accounts {
+		if strings.EqualFold(a.Email, identifier) || strings.EqualFold(a.Label, identifier) {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return ErrAccountNotFound
+	}
+
+	for i, a := range reg.Accounts {
+		if i != idx && strings.EqualFold(a.Label, newLabel) {
+			return ErrLabelInUse
+		}
+	}
+
+	reg.Accounts[idx].Label = newLabel
 	return s.Save(reg)
 }
 

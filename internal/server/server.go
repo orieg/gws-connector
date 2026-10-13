@@ -219,6 +219,16 @@ func (s *Server) registerTools() {
 		s.handleAccountsSetDefault,
 	)
 
+	s.mcpServer.AddTool(
+		mcp.NewTool(s.toolName("gws", "accounts", "rename"),
+			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithDescription("Change an account's label. Sign-in, default status, and settings are unchanged"),
+			mcp.WithString("account", mcp.Required(), mcp.Description("Account label or email to rename")),
+			mcp.WithString("label", mcp.Required(), mcp.Description("The new label (e.g., 'work', 'personal', 'client-acme')")),
+		),
+		s.handleAccountsRename,
+	)
+
 	// Mail tools
 	s.registerMailTools()
 
@@ -543,6 +553,27 @@ func (s *Server) handleAccountsSetDefault(ctx context.Context, req mcp.CallToolR
 
 	acct, _ := s.accountRouter.Resolve(account)
 	return textResult(fmt.Sprintf("Default account set to '%s' (%s).", acct.Label, acct.Email)), nil
+}
+
+func (s *Server) handleAccountsRename(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	account, _ := req.GetArguments()["account"].(string)
+	if account == "" {
+		return errorResult(fmt.Errorf("account is required")), nil
+	}
+	label, _ := req.GetArguments()["label"].(string)
+
+	// Resolve first so the reply can name the old label and the email.
+	before, err := s.accountRouter.Resolve(account)
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	if err := s.accountStore.Rename(before.Email, label); err != nil {
+		return errorResult(err), nil
+	}
+
+	after, _ := s.accountRouter.Resolve(before.Email)
+	return textResult(fmt.Sprintf("Renamed '%s' to '%s' (%s).", before.Label, after.Label, after.Email)), nil
 }
 
 // --- Placeholder registrations for service tools ---
